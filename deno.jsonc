@@ -1,0 +1,77 @@
+{
+  "name": "@zanix/core",
+  "version": "0.1.0",
+  "nodeModulesDir": "auto",
+  "zanix": {
+    "project": "library",
+    "hash": "pn287r"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true
+  },
+  "lint": {
+    "rules": {
+      "tags": [
+        "recommended",
+        "jsr"
+      ],
+      "include": [
+        "eqeqeq",
+        "default-param-last",
+        "camelcase",
+        "no-await-in-loop",
+        "no-const-assign",
+        "no-eval",
+        "no-non-null-asserted-optional-chain",
+        "no-non-null-assertion",
+        "no-self-compare",
+        "no-sync-fn-in-async-fn",
+        "no-throw-literal",
+        "no-useless-rename"
+      ]
+    },
+    "exclude": [
+      ".dist"
+    ],
+    "plugins": [
+      "jsr:@zanix/utils/linter/deno-zanix-plugin"
+    ],
+    "report": "pretty"
+  },
+  "fmt": {
+    "exclude": [
+      ".dist"
+    ],
+    "proseWrap": "always",
+    "indentWidth": 2,
+    "singleQuote": true,
+    "lineWidth": 100,
+    "useTabs": false,
+    "semiColons": false
+  },
+  "imports": {
+    "@std/path": "jsr:@std/path@0.224",
+    "@std/assert": "jsr:@std/assert@0.224",
+    "@std/testing": "jsr:@std/testing@1.0.9",
+    "@zanix/server": "jsr:@zanix/server@1.x",
+    "@zanix/helpers": "jsr:@zanix/utils@2.*/helpers",
+    "typings/": "./src/typings/",
+    "utils/": "./src/utils/",
+    "modules/": "./src/modules/"
+  },
+  "exports": {
+    ".": "./mod.ts"
+  },
+  "publish": {
+    "exclude": [
+      ".github",
+      "src/@tests"
+    ]
+  },
+  "test": {
+    "include": [
+      "src/@tests/**/*.test.ts"
+    ]
+  }
+}
