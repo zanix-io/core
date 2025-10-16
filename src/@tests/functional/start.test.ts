@@ -1,4 +1,4 @@
-import { Zanix } from '@zanix/core'
+import Zanix from '@zanix/core'
 import { webServerManager } from '@zanix/server'
 import { assert } from '@std/assert/assert'
 
