@@ -7,4 +7,10 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2025-10-16
+
+### Fixed
+
+- Import modules from local
+
 ## [0.1.0] - 2025-10-16

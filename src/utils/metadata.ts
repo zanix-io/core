@@ -1,4 +1,4 @@
-import { collectFiles, getRelativePath, getRootDir } from '@zanix/helpers'
+import { collectFiles, getRootDir } from '@zanix/helpers'
 import { join } from '@std/path'
 
 export const defineLocalMetadata = async (
@@ -6,9 +6,10 @@ export const defineLocalMetadata = async (
   types = ['.handler.ts', '.interactor.ts', '.hoc.ts', '.connector.ts'],
 ) => {
   const imports: Promise<unknown>[] = []
-  const relativePath = getRelativePath(getRootDir(), import.meta.dirname)
+
+  const rootFilePath = `file://${getRootDir()}`
   collectFiles(dir, types, (path) => {
-    imports.push(import(join(relativePath, path)))
+    imports.push(import(join(rootFilePath, path)))
   })
 
   await Promise.all(imports)
