@@ -7,7 +7,7 @@ Deno.test('Start module should init some servers', async () => {
   const onCreate = (id: string) => {
     servers.push(id)
   }
-  await Zanix.start({
+  await Zanix.bootstrap({
     server: {
       rest: { onCreate },
       graphql: { onCreate },

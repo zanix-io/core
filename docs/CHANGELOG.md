@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.2] - 2025-10-22
+
+### Changed
+
+- Server starting
+
 ## [0.1.1] - 2025-10-16
 
 ### Fixed

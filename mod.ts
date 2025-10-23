@@ -1,3 +1,12 @@
+/**
+ *  ______               _
+ * |___  /              (_)
+ *    / /   __ _  _ __   _ __  __
+ *   / /   / _` || '_ \ | |\ \/ /
+ * ./ /___| (_| || | | || | >  <
+ * \_____/ \__,_||_| |_||_|/_/\_\
+ */
+
 import { start, stop } from 'modules/start.ts'
 
 /**
@@ -21,10 +30,15 @@ export default class Zanix {
    *
    * @static
    * @function
-   * @param options - An optional object `SetupOptions` where each key is a web server type,
+   * @param {SetupOptions} options - An optional object `SetupOptions` where each key is a web server type,
    * and the value is a partial server configuration specific to that type.
    *   - It extends the `server` property from `ServerManagerOptions<T>`, where `T` is the server type.
    *   - Additionally, it allows an optional `onCreate` callback that is invoked with a server `id` when the server is created.
+   */
+  public static bootstrap = start
+
+  /**
+   * Alias for {@link bootstrap}. Bootstraps all configured servers.
    */
   public static start = start
 

@@ -15,10 +15,10 @@ export const defineLocalMetadata = async (
   await Promise.all(imports)
 }
 
-export const defineGlobalMetadata = async () => {
+export const defineCorelMetadata = async () => {
   const imports: Promise<unknown>[] = []
 
-  // TODO: add global imports, e.g: @zanix/auth/globalMiddlewares
+  // TODO: add global imports, e.g: @zanix/auth/globalMiddlewares DEFINE A SAME MODULE FOR ALL
   //imports.push(import('@zanix/server'))
 
   await Promise.all(imports)
@@ -27,7 +27,7 @@ export const defineGlobalMetadata = async () => {
 export const defineAdminMetadata = async () => {
   const imports: Promise<unknown>[] = []
 
-  // TODO: add core imports, e.g: @zanix/auth/admin
+  // TODO: add core imports, e.g: @zanix/auth/admin DEFINE A SAME MODULE FOR ALL
   //imports.push(import('@zanix/server'))
 
   await Promise.all(imports)

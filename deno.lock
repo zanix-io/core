@@ -22,7 +22,7 @@
     "jsr:@std/path@^1.1.1": "1.1.2",
     "jsr:@std/testing@1.0.9": "1.0.9",
     "jsr:@std/uuid@0.224": "0.224.3",
-    "jsr:@zanix/server@1": "1.0.4",
+    "jsr:@zanix/server@1": "1.0.10",
     "jsr:@zanix/utils@*": "2.1.3",
     "jsr:@zanix/utils@2": "2.1.3",
     "npm:esbuild@0.20.2": "0.20.2",
@@ -152,6 +152,15 @@
     },
     "@zanix/server@1.0.4": {
       "integrity": "4d1f070e8ebdbcadd69c5e0249cf53a2194ce98fa0b1867b7e97dadbf6ab932f",
+      "dependencies": [
+        "jsr:@std/path@0.224",
+        "jsr:@std/uuid",
+        "jsr:@zanix/utils@2",
+        "npm:graphql"
+      ]
+    },
+    "@zanix/server@1.0.10": {
+      "integrity": "20e796f9e9ad39612083c18fb96e21b5adb972e1aa6a635a984f56bfe04a89b6",
       "dependencies": [
         "jsr:@std/path@0.224",
         "jsr:@std/uuid",
