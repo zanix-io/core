@@ -1,5 +1,7 @@
 import type { SetupOptions } from 'typings/setup.ts'
 
+import { defineAdminMetadata, defineCorelMetadata, defineLocalMetadata } from 'utils/metadata.ts'
+import logger from '@zanix/logger'
 import {
   ADMIN_GRAPHQL_PORT,
   ADMIN_REST_PORT,
@@ -7,7 +9,6 @@ import {
   type ServerID,
   webServerManager,
 } from '@zanix/server'
-import { defineAdminMetadata, defineCorelMetadata, defineLocalMetadata } from 'utils/metadata.ts'
 
 const allServers: ServerID[] = []
 
@@ -22,38 +23,41 @@ export const start: (options?: SetupOptions) => Promise<void> = async (
 
   await Promise.all([defineAdminMetadata(), defineCorelMetadata()])
 
-  // Use to dynamically set the globalPrefix for each server type to the server ID for admin servers
-  const globalPrefix = '{{zanix-admin-server-id}}'
-
-  const adminServers = await bootstrapServers({
+  const isInternal = true
+  const internalServers = await bootstrapServers({
     rest: {
-      globalPrefix,
       port: ADMIN_REST_PORT,
       onCreate: (id: string) => {
         Deno.env.set('ADMIN_REST_SERVER_ID', id)
       },
+      isInternal,
     },
     graphql: {
-      globalPrefix,
       port: ADMIN_GRAPHQL_PORT,
       onCreate: (id: string) => {
         Deno.env.set('ADMIN_GRAPQHL_SERVER_ID', id)
       },
+      isInternal,
     },
     socket: {
       port: ADMIN_REST_PORT,
       onCreate: (id: string) => {
         Deno.env.set('ADMIN_SOCKET_SERVER_ID', id)
       },
+      isInternal,
     },
   })
 
-  allServers.push(...adminServers)
+  allServers.push(...internalServers)
 
   /** Start local servers and define project metadata */
 
   await defineLocalMetadata()
   const localServers = await bootstrapServers(options.server)
+
+  if (!localServers.length) {
+    logger.warn('No server was started because the corresponding handlers were not found.')
+  }
 
   allServers.push(...localServers)
 }
