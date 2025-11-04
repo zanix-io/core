@@ -1,6 +1,6 @@
 import type { SetupOptions } from 'typings/setup.ts'
 
-import { defineAdminMetadata, defineCorelMetadata, defineLocalMetadata } from 'utils/metadata.ts'
+import { defineAdminMetadata, defineCoreMetadata, defineLocalMetadata } from 'utils/metadata.ts'
 import logger from '@zanix/logger'
 import {
   ADMIN_GRAPHQL_PORT,
@@ -21,7 +21,7 @@ export const start: (options?: SetupOptions) => Promise<void> = async (
 ) => {
   /** Start admin servers at first to reserve ports and define admin/core metadata */
 
-  await Promise.all([defineAdminMetadata(), defineCorelMetadata()])
+  await Promise.all([defineAdminMetadata(), defineCoreMetadata()])
 
   const isInternal = true
   const internalServers = await bootstrapServers({

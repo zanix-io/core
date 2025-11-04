@@ -15,11 +15,11 @@ export const defineLocalMetadata = async (
   await Promise.all(imports)
 }
 
-export const defineCorelMetadata = async () => {
+export const defineCoreMetadata = async () => {
   const imports: Promise<unknown>[] = []
 
-  // TODO: add global imports, e.g: @zanix/auth/globalMiddlewares DEFINE A SAME MODULE FOR ALL
-  //imports.push(import('@zanix/server'))
+  // Loading Zanix database core — note: MONGO_URI environment variable is required to execute it
+  imports.push(import('@zanix/core/database/mongo'))
 
   await Promise.all(imports)
 }
