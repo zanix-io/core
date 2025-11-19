@@ -43,6 +43,7 @@
     "jsr:@zanix/auth@0": "0.1.0",
     "jsr:@zanix/datamaster@0": "0.4.2",
     "jsr:@zanix/server@1": "1.2.9",
+    "jsr:@zanix/utils@*": "2.2.4",
     "jsr:@zanix/utils@2": "2.2.4",
     "npm:@types/node@*": "24.2.0",
     "npm:esbuild@0.20.2": "0.20.2",
@@ -204,7 +205,7 @@
       "dependencies": [
         "jsr:@std/http",
         "jsr:@zanix/server",
-        "jsr:@zanix/utils"
+        "jsr:@zanix/utils@2"
       ]
     },
     "@zanix/datamaster@0.4.1": {
@@ -212,7 +213,7 @@
       "dependencies": [
         "jsr:@db/sqlite",
         "jsr:@zanix/server",
-        "jsr:@zanix/utils",
+        "jsr:@zanix/utils@2",
         "npm:mongoose",
         "npm:redis"
       ]
@@ -222,7 +223,7 @@
       "dependencies": [
         "jsr:@db/sqlite",
         "jsr:@zanix/server",
-        "jsr:@zanix/utils",
+        "jsr:@zanix/utils@2",
         "npm:mongoose",
         "npm:redis"
       ]
@@ -231,7 +232,7 @@
       "integrity": "4558bdf925423ed30b7d981aa06ebfb421cf29fd57522c6e9867540d2cb8d814",
       "dependencies": [
         "jsr:@std/path@0.224",
-        "jsr:@zanix/utils",
+        "jsr:@zanix/utils@2",
         "npm:graphql",
         "npm:redis"
       ]
