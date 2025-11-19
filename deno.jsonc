@@ -1,6 +1,6 @@
 {
   "name": "@zanix/core",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "nodeModulesDir": "auto",
   "zanix": {
     "project": "library",
@@ -56,9 +56,11 @@
     "@std/testing": "jsr:@std/testing@1.0.9",
     "@zanix/server": "jsr:@zanix/server@1.x",
     "@zanix/database": "jsr:@zanix/datamaster@0.x/database",
-    "@zanix/core": "jsr:@zanix/datamaster@0.x/core",
+    "@zanix/datamaster": "jsr:@zanix/datamaster@0.x/core",
     "@zanix/logger": "jsr:@zanix/utils@2.x/logger",
+    "@zanix/errors": "jsr:@zanix/utils@2.x/errors",
     "@zanix/helpers": "jsr:@zanix/utils@2.*/helpers",
+    "@zanix/auth": "jsr:@zanix/auth@0.*/core",
     "typings/": "./src/typings/",
     "utils/": "./src/utils/",
     "modules/": "./src/modules/"

@@ -1,9 +1,10 @@
 import { collectFiles, getRootDir } from '@zanix/helpers'
+import { ZANIX_SERVER_MODULES } from '@zanix/server'
 import { join } from '@std/path'
 
 export const defineLocalMetadata = async (
   dir = '.',
-  types = ['.handler.ts', '.interactor.ts', '.hoc.ts', '.connector.ts'],
+  types = ZANIX_SERVER_MODULES,
 ) => {
   const imports: Promise<unknown>[] = []
 
@@ -18,8 +19,10 @@ export const defineLocalMetadata = async (
 export const defineCoreMetadata = async () => {
   const imports: Promise<unknown>[] = []
 
-  // Loading Zanix database core — note: MONGO_URI environment variable is required to execute it
-  imports.push(import('@zanix/core/database/mongo'))
+  // Loading Zanix datamaster core
+  imports.push(import('@zanix/datamaster'))
+  // Loading Zanix auth core
+  imports.push(import('@zanix/auth'))
 
   await Promise.all(imports)
 }

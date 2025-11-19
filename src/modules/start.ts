@@ -56,7 +56,10 @@ export const start: (options?: SetupOptions) => Promise<void> = async (
   const localServers = await bootstrapServers(options.server)
 
   if (!localServers.length) {
-    logger.warn('No server was started because the corresponding handlers were not found.')
+    logger.warn(
+      'No server was started because the corresponding handlers were not found.',
+      'noSave',
+    )
   }
 
   allServers.push(...localServers)

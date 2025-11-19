@@ -32,9 +32,16 @@ within the Zanix framework.
 
 ## ⚙️ Features
 
-- Core utilities to initialize and manage Zanix projects
-- Built-in support for REST, GraphQL, and WebSocket servers
-- Simple and scalable project bootstrapping
+- **Comprehensive core utilities** for initializing, configuring, and managing Zanix projects with
+  ease.
+- **Built-in support** for modern communication layers including **REST**, **GraphQL**, and
+  **WebSocket** servers.
+- **Lightweight and scalable project bootstrapping**, designed to grow seamlessly with your
+  application.
+- **Powerful HTTP connectors**, such as
+  [`GraphQLClient`](./src/modules/connectors/graphql.connector.ts) and
+  [`RestClient`](./src/modules/connectors/rest.connector.ts), providing a unified interface for API
+  communication.
 
 ---
 

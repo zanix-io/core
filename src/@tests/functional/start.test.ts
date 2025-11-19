@@ -1,6 +1,6 @@
 import { webServerManager } from '@zanix/server'
-import { assertSpyCalls, stub } from '@std/testing/mock'
-import { assert } from '@std/assert'
+import { stub } from '@std/testing/mock'
+import { assert, assertFalse } from '@std/assert'
 import Zanix from '../../../mod.ts'
 
 /** mocks */
@@ -9,9 +9,10 @@ const consoleSuccess = stub(console, 'info')
 Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
-  name: 'Start module should init servers with core modules',
+  name: 'Start module should init servers',
   fn: async () => {
-    Deno.env.set('MONGO_URI', 'mongodb://localhost')
+    Deno.env.delete('MONGO_URI')
+    Deno.env.delete('REDIS_URI')
 
     const servers: string[] = []
     const onCreate = (id: string) => {
@@ -25,11 +26,11 @@ Deno.test({
       },
     })
 
-    await new Promise((resolve) => setTimeout(resolve, 1000)) // wait until mongo core connection
-
-    assertSpyCalls(consoleSuccess, 7)
-    assert(
+    assertFalse(
       consoleSuccess.calls.some((call) => call.args[1].includes('MongoDB Connected Successfully')),
+    )
+    assertFalse(
+      consoleSuccess.calls.some((call) => call.args[1].includes('Redis Connected Successfully')),
     )
 
     assert(servers.length === 3)
