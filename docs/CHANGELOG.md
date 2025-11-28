@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.2] - 2025-11-27
+
+### Added
+
+- Zanix Notifications core library support.
+
 ## [0.2.0] - 2025-11-19
 
 ### Changed

@@ -40,17 +40,20 @@
     "jsr:@std/streams@~0.224.5": "0.224.5",
     "jsr:@std/testing@1.0.9": "1.0.9",
     "jsr:@std/uuid@0.224": "0.224.3",
-    "jsr:@zanix/auth@0": "0.1.0",
+    "jsr:@zanix/auth@0": "0.3.1",
     "jsr:@zanix/datamaster@0": "0.4.2",
-    "jsr:@zanix/server@1": "1.2.9",
-    "jsr:@zanix/utils@*": "2.2.4",
-    "jsr:@zanix/utils@2": "2.2.4",
+    "jsr:@zanix/notifications@0": "0.1.0",
+    "jsr:@zanix/server@1": "1.3.0",
+    "jsr:@zanix/server@^1.3.0": "1.3.0",
+    "jsr:@zanix/utils@*": "2.2.6",
+    "jsr:@zanix/utils@2": "2.2.6",
     "npm:@types/node@*": "24.2.0",
     "npm:esbuild@0.20.2": "0.20.2",
     "npm:graphql@16": "16.10.0",
     "npm:javascript-obfuscator@^4.0.2": "4.1.1",
     "npm:mongoose@^6.7.0": "6.13.8",
-    "npm:redis@^5.9.0": "5.9.0_@redis+client@5.9.0"
+    "npm:redis@^5.9.0": "5.9.0_@redis+client@5.9.0",
+    "npm:zod@^4.1.13": "4.1.13"
   },
   "jsr": {
     "@db/sqlite@0.12.0": {
@@ -200,11 +203,11 @@
         "jsr:@std/crypto"
       ]
     },
-    "@zanix/auth@0.1.0": {
-      "integrity": "d703060888a2b862c78bc886cf9d54f3c369ddbe25be6d6deb5e1e2ae28a618c",
+    "@zanix/auth@0.3.1": {
+      "integrity": "456aea7039f7b0da15add4ea2759c64eeae24f142e1d625f2bac2758f6c391ef",
       "dependencies": [
         "jsr:@std/http",
-        "jsr:@zanix/server",
+        "jsr:@zanix/server@1",
         "jsr:@zanix/utils@2"
       ]
     },
@@ -212,7 +215,7 @@
       "integrity": "ddbc9ded638bb5fcbee026f597599948a25862e722b0d56c779e6133cc6cddb3",
       "dependencies": [
         "jsr:@db/sqlite",
-        "jsr:@zanix/server",
+        "jsr:@zanix/server@1",
         "jsr:@zanix/utils@2",
         "npm:mongoose",
         "npm:redis"
@@ -222,23 +225,32 @@
       "integrity": "e075ae4dcd3653a0fc16b1256349f34b5358c0a6905d76f248de7fd60cc7cc6a",
       "dependencies": [
         "jsr:@db/sqlite",
-        "jsr:@zanix/server",
+        "jsr:@zanix/server@1",
         "jsr:@zanix/utils@2",
         "npm:mongoose",
         "npm:redis"
       ]
     },
-    "@zanix/server@1.2.9": {
-      "integrity": "4558bdf925423ed30b7d981aa06ebfb421cf29fd57522c6e9867540d2cb8d814",
+    "@zanix/notifications@0.1.0": {
+      "integrity": "9d45c43081e3bacb5fe33f1849219580d7775eab17edfbdc132bc35f6d6d0487",
+      "dependencies": [
+        "jsr:@zanix/server@1",
+        "jsr:@zanix/utils@2",
+        "npm:zod"
+      ]
+    },
+    "@zanix/server@1.3.0": {
+      "integrity": "ecbb8ded9c776efd7bdc879ffb708280b775ca153cd862b7c8e59cee20e5daf9",
       "dependencies": [
         "jsr:@std/path@0.224",
+        "jsr:@zanix/server@^1.3.0",
         "jsr:@zanix/utils@2",
         "npm:graphql",
         "npm:redis"
       ]
     },
-    "@zanix/utils@2.2.4": {
-      "integrity": "b9a23df9f073ebd46d7f7d9babe3449388e01c878a7838053b85cba66f2fe9dc",
+    "@zanix/utils@2.2.6": {
+      "integrity": "37be22b3189af08334dc139fc0ea3a7b398de7157cc835968e38c4d2d94cc63b",
       "dependencies": [
         "jsr:@luca/esbuild-deno-loader",
         "jsr:@std/fmt@0.224",
@@ -1888,6 +1900,9 @@
     },
     "word-wrap@1.2.5": {
       "integrity": "sha512-BN22B5eaMMI9UMtjrGd5g5eCYPpCPDUy0FJXbYsaT5zYxjFOckS53SQDE3pWkVoWpHXVb3BrYcEN4Twa55B5cA=="
+    },
+    "zod@4.1.13": {
+      "integrity": "sha512-AvvthqfqrAhNH9dnfmrfKzX5upOdjUVJYFqNSlkmGf64gRaTzlPwz99IHYnVs28qYAybvAlBV+H7pn0saFY4Ig=="
     }
   },
   "workspace": {
@@ -1897,6 +1912,7 @@
       "jsr:@std/testing@1.0.9",
       "jsr:@zanix/auth@0",
       "jsr:@zanix/datamaster@0",
+      "jsr:@zanix/notifications@0",
       "jsr:@zanix/server@1",
       "jsr:@zanix/utils@2"
     ]
