@@ -44,8 +44,8 @@
     "jsr:@zanix/auth@0": "0.3.1",
     "jsr:@zanix/datamaster@0": "0.4.2",
     "jsr:@zanix/notifications@0": "0.1.0",
-    "jsr:@zanix/server@1": "1.3.0",
-    "jsr:@zanix/server@^1.3.0": "1.3.0",
+    "jsr:@zanix/server@1": "1.4.7",
+    "jsr:@zanix/server@^1.4.7": "1.4.7",
     "jsr:@zanix/utils@*": "2.2.6",
     "jsr:@zanix/utils@2": "2.2.6",
     "npm:@types/node@*": "24.2.0",
@@ -249,11 +249,12 @@
         "npm:zod"
       ]
     },
-    "@zanix/server@1.3.0": {
-      "integrity": "ecbb8ded9c776efd7bdc879ffb708280b775ca153cd862b7c8e59cee20e5daf9",
+    "@zanix/server@1.4.7": {
+      "integrity": "d3aca69d78747051776e3c1cae8c960bf94c7a1225b41b817961874d038c5e1d",
       "dependencies": [
+        "jsr:@std/http",
         "jsr:@std/path@0.224",
-        "jsr:@zanix/server@^1.3.0",
+        "jsr:@zanix/server@^1.4.7",
         "jsr:@zanix/utils@2",
         "npm:graphql",
         "npm:redis"
