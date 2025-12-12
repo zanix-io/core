@@ -25,6 +25,8 @@ export const defineCoreMetadata = async () => {
   imports.push(import('@zanix/auth'))
   // Loading Zanix notifications core
   imports.push(import('@zanix/notifications'))
+  // Loading Zanix asyncmq core
+  imports.push(import('@zanix/asyncmq'))
 
   await Promise.all(imports)
 }
