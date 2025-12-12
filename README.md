@@ -43,8 +43,6 @@ within the Zanix framework.
   [`RestClient`](./src/modules/connectors/rest.connector.ts), providing a unified interface for API
   communication.
 
-//TODO: ADD TEMPLATES
-
 ## 📦 Installation
 
 Install **Zanix Core** in your project using [Deno](https://deno.com/):
