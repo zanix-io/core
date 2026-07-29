@@ -1,3 +1,5 @@
+// deno-coverage-ignore-file
+
 import {
   Controller,
   Get,
