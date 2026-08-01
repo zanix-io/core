@@ -21,11 +21,14 @@ import { start, stop } from 'modules/start.ts'
 import { startWorker, stopWorker } from 'modules/worker.ts'
 import { setup } from 'modules/setup.ts'
 
-// `@zanix/admin` owns the admin domain in full now (roles, protocol version/header + negotiation
-// guard, templates service/repository/RTOs, triggers service/repository/RTOs, the service-exchange
-// controller, and the protocol clients) — re-exported here as-is so existing consumers of
-// `@zanix/core`'s public API see no change, even though the definitions themselves live in
-// `@zanix/admin` now (not duplicated against it). See `docs/admin-apis.md` for the full guide.
+// `@zanix/admin` composes the admin domain (roles, protocol version/header + negotiation guard,
+// the service-exchange controller, and the protocol clients) — but the actual CRUD/business logic
+// behind templates (`TemplatesAdminRepository`/`Service`) and triggers
+// (`TriggersAdminRepository`/`Service`) is authored by their real data owners,
+// `@zanix/notifications` and `@zanix/datamaster` respectively; `@zanix/admin` only re-exports them.
+// Everything below is re-exported here as-is so existing consumers of `@zanix/core`'s public API
+// see no change, regardless of which package actually defines each symbol. See `docs/admin-apis.md`
+// for the full guide.
 export {
   ADMIN_PROTOCOL_HEADER,
   ADMIN_PROTOCOL_SUPPORTED_VERSIONS,
@@ -50,7 +53,8 @@ export {
   UpdateTriggerRTO,
 } from '@zanix/admin'
 export type { ConfigOptions } from 'typings/config.ts'
-export type { ErrorLogThrottleConfig, ErrorLogThrottleStore } from '@zanix/server'
+export type { AdminBootstrapServerOptions, SetupOptions } from 'typings/setup.ts'
+export type { ErrorLogThrottleConfig, ErrorLogThrottleStore, WebServerTypes } from '@zanix/server'
 export type { ElasticsearchLogSaveOptions } from '@zanix/datamaster/observability'
 export type { DefaultResponse, LoggerFunctionOptions } from '@zanix/types'
 
@@ -64,6 +68,14 @@ export type { DefaultResponse, LoggerFunctionOptions } from '@zanix/types'
  * the same env-var fallback chain — calling both in the same process without passing distinct
  * ports to at least one of them will fail with `AddrInUse`. See `@zanix/admin`'s own docs for
  * `ZanixAdmin.start`'s options.
+ *
+ * Never enable `Zanix.start()`'s own `admin` option in the same process as `ZanixAdmin.start()` —
+ * both would independently register `@zanix/admin` metadata (this service's own triggers/templates/
+ * service-token routes here, `ZanixAdmin`'s own triggers-proxy/templates-store routes there —
+ * they're deliberately different route sets, see `docs/admin-apis.md`'s "Architecture" section)
+ * against the same shared registry; a runtime guard throws an `InternalError` if you do. Leave
+ * `admin` at its default (`false`) when also running `ZanixAdmin.start()` — see
+ * `docs/admin-apis.md`.
  */
 export { default as ZanixAdmin } from '@zanix/admin'
 
@@ -105,10 +117,13 @@ export default class Zanix {
    *
    * @static
    * @function
-   * @param {SetupOptions} options - An optional object `SetupOptions` where each key is a web server type,
-   * and the value is a partial server configuration specific to that type.
-   *   - It extends the `server` property from `ServerManagerOptions<T>`, where `T` is the server type.
-   *   - Additionally, it allows an optional `onCreate` callback that is invoked with a server `id` when the server is created.
+   * @param {SetupOptions} options - An optional object with two independent keys:
+   *   - `server`: per-web-server-type (`rest`/`graphql`/`socket`) partial configuration for this
+   *     service's own public server(s), each accepting an optional `onCreate` callback invoked
+   *     with the server `id` once it's created.
+   *   - `admin`: enables and configures `@zanix/admin`'s built-in triggers/templates/service-token
+   *     server(s) alongside the public one(s) above. Disabled (`false`) by default — see
+   *     {@link SetupOptions} and `docs/admin-apis.md` for the full shape.
    */
   public static bootstrap: typeof start = start
 

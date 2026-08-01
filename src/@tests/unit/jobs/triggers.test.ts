@@ -1,71 +1,29 @@
 import { assertEquals } from '@std/assert'
-import { mailJobHandler, requestJobHandler } from 'modules/jobs/triggers.ts'
+import { DEFAULT_TRIGGER_JOBS, getRegisteredTriggerActionJobs } from '@zanix/database'
+import { registerPendingTriggerActionJobs, requestJobHandler } from 'modules/jobs/triggers.ts'
 
-Deno.test('mailJobHandler forwards fields to NotifierProvider.sendMessage', async () => {
-  const calls: unknown[] = []
+// `mailJobHandler`'s own behavior (mapping a `mail` trigger action onto `NotifierProvider`) now
+// lives in `@zanix/notifications` (`sendMailTriggerNotification`, `MailTriggerActionData`) — see
+// that package's own unit tests. This file only covers what `@zanix/core` itself still owns:
+// `request` (the ownerless generic `fetch` handler) and the descriptor drain loop.
 
-  const fakeThis = {
-    providers: {
-      get: () => ({
-        sendMessage: (notifier: string, message: unknown) => {
-          calls.push({ notifier, message })
-          return Promise.resolve()
-        },
-      }),
-    },
-  }
+Deno.test('registerPendingTriggerActionJobs registers "request" as a descriptor', () => {
+  registerPendingTriggerActionJobs()
 
-  await mailJobHandler.call(fakeThis as never, {
-    to: 'a@b.com',
-    subject: 'Hi',
-    from: 'noreply@example.com',
-    body: { template: 'welcome', data: { name: 'A' } },
-  })
-
-  assertEquals(calls.length, 1)
-  assertEquals((calls[0] as { notifier: string }).notifier, 'email')
-  assertEquals(
-    (calls[0] as { message: { to: string } }).message.to,
-    'a@b.com',
-  )
-  assertEquals(
-    (calls[0] as { message: { zanixTemplate: unknown; data: unknown } }).message.zanixTemplate,
-    'welcome',
-  )
-  assertEquals(
-    (calls[0] as { message: { zanixTemplate: unknown; data: unknown } }).message.data,
-    { name: 'A' },
-  )
+  const request = getRegisteredTriggerActionJobs().find((d) => d.actionKind === 'request')
+  assertEquals(request?.name, DEFAULT_TRIGGER_JOBS.request)
+  assertEquals(request?.processingQueue, 'soft')
 })
 
-Deno.test('mailJobHandler forwards a literal string as body.data as-is', async () => {
-  const calls: unknown[] = []
-
-  const fakeThis = {
-    providers: {
-      get: () => ({
-        sendMessage: (notifier: string, message: unknown) => {
-          calls.push({ notifier, message })
-          return Promise.resolve()
-        },
-      }),
-    },
-  }
-
-  await mailJobHandler.call(fakeThis as never, {
-    to: 'a@b.com',
-    subject: 'Hi',
-    body: { template: 'generic', data: 'plain text body' },
-  })
-
-  assertEquals(
-    (calls[0] as { message: { zanixTemplate: unknown } }).message.zanixTemplate,
-    'generic',
-  )
-  assertEquals(
-    (calls[0] as { message: { data: unknown } }).message.data,
-    'plain text body',
-  )
+Deno.test({
+  name: 'registerPendingTriggerActionJobs is a no-op on a second call in the same process',
+  fn: () => {
+    // Guards against re-registering (and throwing) on a second `defineCoreMetadata()` cycle, e.g.
+    // many independent `Zanix.bootstrap()` calls in one `deno test` run — see this function's own
+    // doc for why neither registry involved is ever wiped between boots.
+    registerPendingTriggerActionJobs()
+    registerPendingTriggerActionJobs()
+  },
 })
 
 Deno.test('requestJobHandler performs a fetch with the given url/method/headers/body', async () => {

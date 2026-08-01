@@ -10,14 +10,18 @@ Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
   name:
-    'admin triggers API: registered internal-only via Zanix.bootstrap(), rejects unauthenticated',
+    'admin triggers API: registered on the admin Application via Zanix.bootstrap(), rejects unauthenticated',
   fn: async () => {
     Deno.env.set('MONGO_URI', 'mongodb://localhost')
     Deno.env.set('REDIS_URI', 'redis://localhost:6379')
+    // There is no auto-generated anchored id anymore — set one explicitly so the admin server is
+    // reachable at a known address.
+    Deno.env.set('ADMIN_SERVER_ID', 'admin-apis-test')
 
     const publicServers: string[] = []
 
     await Zanix.bootstrap({
+      admin: true,
       server: {
         rest: { onCreate: (id) => publicServers.push(id) },
         graphql: { onCreate: (id) => publicServers.push(id) },
@@ -27,16 +31,13 @@ Deno.test({
 
     await new Promise((resolve) => setTimeout(resolve, 1000)) // wait for mongo/redis core connect
 
-    // The admin REST server id isn't returned to this test directly, but its address is
-    // discoverable through the well-known env var `start.ts` sets on create.
-    const adminServerId = Deno.env.get('ADMIN_REST_SERVER_ID')
-    assert(adminServerId, 'ADMIN_REST_SERVER_ID should have been set by the admin bootstrap')
+    const adminServerId = 'admin-apis-test-rest'
 
     const adminInfo = webServerManager.info(adminServerId as never)
     const adminAddr = adminInfo.addr
     assert(adminAddr, 'the admin rest server should be listening')
 
-    // An `isInternal` server is assigned its own UUID as global prefix (see
+    // A non-default Application's server is assigned its own UUID as global prefix (see
     // `WebServerManager.create`), so its routes live under `/{serverId}/...`, not at the root.
     const baseUrl = `http://${adminAddr.hostname}:${adminAddr.port}/${adminServerId}`
 
@@ -49,7 +50,7 @@ Deno.test({
     assertEquals(unauthenticated.status, 401)
     await unauthenticated.body?.cancel()
 
-    // Not registered on the public server at all — confirms isInternal isolation.
+    // Not registered on the default-Application server at all — confirms Application isolation.
     const publicChecks = publicServers
       .map((id) => webServerManager.info(id as never))
       .filter((info) => info.type === 'rest')
@@ -61,6 +62,7 @@ Deno.test({
       })
     await Promise.all(publicChecks)
 
+    Deno.env.delete('ADMIN_SERVER_ID')
     Zanix.stop()
   },
 })

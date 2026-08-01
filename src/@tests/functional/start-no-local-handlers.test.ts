@@ -39,9 +39,9 @@ Deno.test({
 
     assert(
       warnStub.calls.some((call) =>
-        call.args.some((arg) => String(arg).includes('No server was started'))
+        call.args.some((arg) => String(arg).includes('The main server was not started'))
       ),
-      'expected the "No server was started" warning to have been logged',
+      'expected the "The main server was not started" warning to have been logged',
     )
 
     Zanix.stop()

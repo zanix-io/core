@@ -9,16 +9,21 @@ stub(console, 'warn')
 Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
-  name: 'admin templates API: registered internal-only when TEMPLATES_MODEL_NAME is set',
+  name:
+    'admin templates API: registered on the admin Application only when TEMPLATES_MODEL_NAME is set',
   fn: async () => {
     Deno.env.set('MONGO_URI', 'mongodb://localhost')
     Deno.env.set('REDIS_URI', 'redis://localhost:6379')
     Deno.env.set('TEMPLATES_MODEL_NAME', 'zanix-templates')
+    // There is no auto-generated anchored id anymore — set one explicitly so the admin server is
+    // reachable at a known address.
+    Deno.env.set('ADMIN_SERVER_ID', 'admin-templates-api-test')
 
     const publicServers: string[] = []
 
     try {
       await Zanix.bootstrap({
+        admin: true,
         server: {
           rest: { onCreate: (id) => publicServers.push(id) },
         },
@@ -26,8 +31,7 @@ Deno.test({
 
       await new Promise((resolve) => setTimeout(resolve, 1000)) // wait for mongo/redis core connect
 
-      const adminServerId = Deno.env.get('ADMIN_REST_SERVER_ID')
-      assert(adminServerId, 'ADMIN_REST_SERVER_ID should have been set')
+      const adminServerId = 'admin-templates-api-test-rest'
 
       const adminInfo = webServerManager.info(adminServerId as never)
       const adminAddr = adminInfo.addr
@@ -44,7 +48,14 @@ Deno.test({
       assertEquals(unauthenticated.status, 401)
       await unauthenticated.body?.cancel()
 
-      // Not registered on the public server at all — confirms isInternal isolation.
+      // `@zanix/admin`'s own `defineAdminMetadata()` also registers a read-only Discovery endpoint
+      // alongside the CRUD one — proves it's reachable (auth-gated, same as CRUD) on the same admin
+      // server, not just that registering it didn't throw.
+      const discoveryUnauthenticated = await fetch(`${baseUrl}/.well-known/zanix/templates`)
+      assertEquals(discoveryUnauthenticated.status, 401)
+      await discoveryUnauthenticated.body?.cancel()
+
+      // Not registered on the default-Application server at all — confirms Application isolation.
       const publicChecks = publicServers
         .map((id) => webServerManager.info(id as never))
         .filter((info) => info.type === 'rest')
@@ -53,12 +64,17 @@ Deno.test({
           const res = await fetch(`${publicUrl}/admin/templates/list`)
           assertEquals(res.status, 404)
           await res.body?.cancel()
+
+          const discoveryRes = await fetch(`${publicUrl}/.well-known/zanix/templates`)
+          assertEquals(discoveryRes.status, 404)
+          await discoveryRes.body?.cancel()
         })
       await Promise.all(publicChecks)
 
       Zanix.stop()
     } finally {
       Deno.env.delete('TEMPLATES_MODEL_NAME')
+      Deno.env.delete('ADMIN_SERVER_ID')
     }
   },
 })

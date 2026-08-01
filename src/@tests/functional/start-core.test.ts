@@ -14,13 +14,14 @@ Deno.test({
     Deno.env.set('MONGO_URI', 'mongodb://localhost')
     Deno.env.set('REDIS_URI', 'redis://localhost:6379')
 
-    await Zanix.bootstrap()
+    await Zanix.bootstrap({ admin: true })
 
     await new Promise((resolve) => setTimeout(resolve, 1000)) // wait until mongo core connection
 
-    // Includes the admin server's own triggers-admin and service-exchange routes (templates-admin
-    // isn't registered here — TEMPLATES_MODEL_NAME/DATABASE_TEMPLATES aren't set in this test).
-    assertSpyCalls(consoleSuccess, 15)
+    // Includes the admin server's own triggers-admin, triggers-discovery, and service-exchange
+    // routes (templates-admin isn't registered here — TEMPLATES_MODEL_NAME/DATABASE_TEMPLATES
+    // aren't set in this test).
+    assertSpyCalls(consoleSuccess, 16)
     assert(
       consoleSuccess.calls.some((call) => call.args[1].includes('MongoDB Connected Successfully')),
     )

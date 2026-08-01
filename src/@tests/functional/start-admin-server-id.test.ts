@@ -1,29 +1,39 @@
-import { assertEquals } from '@std/assert'
+import { assert } from '@std/assert'
 import { stub } from '@std/testing/mock'
-import { Query, Resolver, Socket, ZanixResolver, ZanixWebSocket } from '@zanix/server'
+import {
+  ProgramModule,
+  Query,
+  Resolver,
+  Socket,
+  webServerManager,
+  ZanixResolver,
+  ZanixWebSocket,
+} from '@zanix/server'
 import Zanix from '../../../mod.ts'
 
 /**
  * `defineAdminMetadata()` always registers the REST triggers admin route, but graphql/socket
- * admin servers are only created once a genuinely `isInternal: true` resolver/socket exists (see
- * `start-admin-scope.test.ts`) — these throwaway fixtures give this file its own, since
+ * admin servers are only created once a genuinely `'admin'`-Application resolver/socket exists
+ * (see `start-admin-scope.test.ts`) — these throwaway fixtures give this file its own, since
  * `Zanix.bootstrap()` clears resolver/socket registration metadata after boot
  * (`cleanupInitializationsMetadata`), so a second boot in another test file can't reuse them.
  */
-@Resolver({ isInternal: true })
-class _AdminServerIdResolver extends ZanixResolver {
-  @Query()
-  public adminServerIdProbe() {
-    return 'internal'
+await ProgramModule.defineApplication('admin', () => {
+  @Resolver()
+  class _AdminServerIdResolver extends ZanixResolver {
+    @Query()
+    public adminServerIdProbe() {
+      return 'internal'
+    }
   }
-}
 
-@Socket({ route: 'admin-server-id-probe', isInternal: true })
-class _AdminServerIdSocket extends ZanixWebSocket {
-  protected override onmessage() {
-    return { message: 'internal' }
+  @Socket({ route: 'admin-server-id-probe' })
+  class _AdminServerIdSocket extends ZanixWebSocket {
+    protected override onmessage() {
+      return { message: 'internal' }
+    }
   }
-}
+})
 
 stub(console, 'info')
 stub(console, 'warn')
@@ -38,12 +48,21 @@ Deno.test({
     Deno.env.set('ADMIN_SERVER_ID', 'custom-billing')
 
     try {
-      await Zanix.bootstrap()
+      await Zanix.bootstrap({ admin: true })
       await new Promise((resolve) => setTimeout(resolve, 1000)) // wait for mongo/redis core connect
 
-      assertEquals(Deno.env.get('ADMIN_REST_SERVER_ID'), 'custom-billing-rest')
-      assertEquals(Deno.env.get('ADMIN_GRAPQHL_SERVER_ID'), 'custom-billing-graphql')
-      assertEquals(Deno.env.get('ADMIN_SOCKET_SERVER_ID'), 'custom-billing-socket')
+      assert(
+        webServerManager.info('custom-billing-rest' as never).addr,
+        'rest server should be reachable under the ADMIN_SERVER_ID-derived id',
+      )
+      assert(
+        webServerManager.info('custom-billing-graphql' as never).addr,
+        'graphql server should be reachable under the ADMIN_SERVER_ID-derived id',
+      )
+      assert(
+        webServerManager.info('custom-billing-socket' as never).addr,
+        'socket server should be reachable under the ADMIN_SERVER_ID-derived id',
+      )
 
       Zanix.stop()
     } finally {
