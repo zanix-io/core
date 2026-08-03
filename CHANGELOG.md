@@ -7,14 +7,53 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-07-31
-
-Consolidates everything since `0.3.0` — none of the intermediate `0.4.0` work was ever published, so
-it's folded into this one entry. Tracks `@zanix/server@3.0.0`'s retirement of `isInternal` in favor
-of Application (ownership) + `anchored` (URL-obscurity) — see that package's own CHANGELOG for the
-full model.
+## [0.4.0] - 2026-08-03
 
 ### Added
+
+- **`SetupOptions.codeTemplatesDiscovery`** — exposes this process's own in-code notification
+  templates (`@zanix/notifications`'s `CODE_TEMPLATES`) under `/.well-known/zanix/code-templates`,
+  via `defineCodeTemplatesDiscovery()`. **Disabled by default** — deliberately independent of
+  `TEMPLATES_SERVICE_URL` (Mode C): consuming templates from a remote source doesn't imply agreeing
+  to expose your own catalog back (the target might not even be Zanix-based, and
+  `RemoteTemplateBackend`'s own sync trigger is already best-effort, never a hard requirement — see
+  `@zanix/notifications`'s `docs/templates.md`). `true` guards it with `@zanix/admin`'s new
+  `createTemplatesDiscoveryGuard()` (`ADMIN_ROLE`/`ADMIN_TEMPLATES_ROLE`) — the same guard that
+  already protects `/.well-known/zanix/templates`, shared from one place instead of each side
+  inlining its own `jwtValidationGuard(...)` construction — one role for every templates-shaped
+  Discovery surface. Pass an object to override `guards` (`[]` to deliberately serve it
+  unauthenticated) or `application`. Registered under the `'admin'` Application when `admin` is also
+  enabled (matching where `ZANIX_ADMIN_SERVICES`'s `adminBaseUrl` conventionally points), the
+  default Application otherwise — `admin` has no server backing it at all when disabled, so
+  registering under it in that case would leave the route live in metadata but never actually
+  served. New exported `CodeTemplatesDiscoveryOptions` type.
+- **`SetupOptions.apps`** — named secondary apps bootstrapped alongside the main one, each on its
+  own Application, sequentially, before the main app's own (finalizing) bootstrap. Each entry has
+  its own `rootDir` (auto-discovery, scoped away from the main app's and every other named app's)
+  and `server` (explicit-only `id`/`previousId`/`port`/etc., no env fallback). `'main'` and
+  `'admin'` are reserved keys and throw if used here — the main app is configured via the top-level
+  `server`/`rootDir`, the admin server via the top-level `admin` option. See `docs/admin-apis.md`
+  and `AppBootstrapOptions`'s own JSDoc.
+- **`SetupOptions.rootDir`** (top-level and per `apps` entry) now accepts `string[]` in addition to
+  a single `string` — auto-discovery scans every listed directory. Required `@zanix/utils`'s
+  `collectFiles` to gain the same multi-root support (a local-only dependency bump for now, not yet
+  published).
+- An explicit `admin.<type>.id`/`.previousId` now wins over the `ADMIN_SERVER_ID`/
+  `ADMIN_SERVER_ID_PREVIOUS` env vars, matching the "explicit option beats env var" precedence every
+  other Zanix option already follows — previously these were silently discarded in favor of the
+  env-derived value regardless of what was passed. Needed to run more than one admin-enabled
+  instance of a service distinguishably without relying on a single process-wide env var.
+- A second `Zanix.start()`/`Zanix.bootstrap()` call overlapping a first one still in flight (e.g.
+  called twice back to back without `await`ing the first) now throws immediately instead of racing
+  against the same process-wide route/DI/discovery registries and silently corrupting state (e.g.
+  dropping `admin` on the first call).
+- A second `Zanix.start()`/`Zanix.bootstrap()` call issued **after** a previous one already finished
+  successfully in the same process, without an intervening `Zanix.stop()`, now throws immediately
+  instead of silently registering a second, independent set of servers — same guard added to
+  `ZanixAdminHub.start()`. At most one running `Zanix`/`ZanixAdminHub` server per process, always —
+  call `stop()` before starting again. Both guards are now implemented via `@zanix/server`'s new
+  shared `createStartLifecycleGuard`, replacing this package's own hand-rolled module-level booleans
+  — same behavior, one fewer place to keep in sync with `@zanix/admin`'s own copy.
 
 - `SetupOptions` (the type for `Zanix.start()`/`Zanix.bootstrap()`'s own `options` argument,
   including the new `admin` field below) is now re-exported from `mod.ts`, matching the existing
@@ -45,6 +84,20 @@ full model.
 
 ### Changed (breaking)
 
+- **`Zanix.start({ admin: true })` may now safely run in the same process as `ZanixAdminHub.start()`
+  — supersedes `0.5.0`'s mutual-exclusion guard, which is removed.** `@zanix/server`'s new
+  boot-session isolation (`BootSessionContainer`, preserving whichever Applications a DIFFERENT,
+  still-in-flight `start()` sequence currently owns from `finalize` cleanup) plus `@zanix/admin`'s
+  own split of `ZanixAdminHub`'s route set onto a distinct Application (`ADMIN_HUB_APPLICATION`,
+  `'admin-hub'`, no longer `'admin'`) make the combination safe, even fired without a sequential
+  `await` between the two calls. See `@zanix/admin`'s own CHANGELOG and
+  `docs/admin-architecture.md#running-both-servers`. `releaseAdminRegistration('core')` calls (in
+  `start()`'s failure path and in `stop()`) are removed along with the guard they paired with.
+- `Zanix.start()`'s own admin bootstrap now resolves its stable id via `@zanix/server`'s new generic
+  `resolveApplicationServerId('admin', type)`/`resolvePreviousApplicationServerId('admin', type)`,
+  replacing the removed `resolveAdminServerId`/`resolvePreviousAdminServerId` — same
+  `ADMIN_SERVER_ID`/ `ADMIN_SERVER_ID_PREVIOUS` env vars, no observable behavior change for this
+  package's own callers.
 - **The admin server is now disabled by default.** `Zanix.start()` used to always register
   `@zanix/admin`'s triggers/templates/service-token routes and bootstrap a second, anchored,
   `'admin'`-Application server for them; now it doesn't unless you pass a new `admin` option:
@@ -60,10 +113,10 @@ full model.
   accepts `application` or `anchored` — an admin sub-server is always bound to the `'admin'`
   Application and always `anchored: true`; passing either is now a compile-time type error instead
   of a silent override.
-- Running `Zanix.start({ admin: true })` and `ZanixAdmin.start()` in the same process now throws a
-  clear `InternalError` instead of silently corrupting shared route/resolver metadata (see
+- Running `Zanix.start({ admin: true })` and `ZanixAdminHub.start()` in the same process now throws
+  a clear `InternalError` instead of silently corrupting shared route/resolver metadata (see
   `@zanix/server`'s `guardSingleAdminRegistration`) — this was always unsafe, just silent before.
-  The already-documented "this service's own API + a separate `ZanixAdmin` hub" pattern is
+  The already-documented "this service's own API + a separate `ZanixAdminHub` hub" pattern is
   unaffected: it only needs `Zanix.start()`'s new default (`admin` left `false`).
 - **This package no longer owns any admin-domain composition logic of its own.** The
   `/admin/triggers`/`/admin/templates`/`/admin/service-token` controller-building and
@@ -175,10 +228,10 @@ longer imports) and `@zanix/admin@^0.3.0` or later (owns `defineAdminMetadata` a
   `createTriggersAdminController`/`createTemplatesController`/`createServiceExchangeController`
   directly — no local wrapper files, no duplicate controller classes. No public API change for
   existing `@zanix/core` consumers.
-- `ZanixAdmin` (`@zanix/admin`'s own reference deployable entrypoint) is now re-exported as a named
-  export from `@zanix/core`'s `mod.ts`, so a team that wants both roles — this service's own
+- `ZanixAdminHub` (`@zanix/admin`'s own reference deployable entrypoint) is now re-exported as a
+  named export from `@zanix/core`'s `mod.ts`, so a team that wants both roles — this service's own
   business API, plus the centralized admin hub — can do so via `@zanix/core` alone. `Zanix.start()`
-  and `ZanixAdmin.start()` resolve their own public REST server's port from the same env-var
+  and `ZanixAdminHub.start()` resolve their own public REST server's port from the same env-var
   fallback chain, so calling both in the same process needs a distinct `port` passed to at least one
   of them.
 - The admin protocol is no longer purely informational: `@zanix/admin`'s controllers now configure

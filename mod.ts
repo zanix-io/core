@@ -53,7 +53,13 @@ export {
   UpdateTriggerRTO,
 } from '@zanix/admin'
 export type { ConfigOptions } from 'typings/config.ts'
-export type { AdminBootstrapServerOptions, SetupOptions } from 'typings/setup.ts'
+export type {
+  AdminBootstrapServerOptions,
+  AppBootstrapOptions,
+  AppsOptions,
+  CodeTemplatesDiscoveryOptions,
+  SetupOptions,
+} from 'typings/setup.ts'
 export type { ErrorLogThrottleConfig, ErrorLogThrottleStore, WebServerTypes } from '@zanix/server'
 export type { ElasticsearchLogSaveOptions } from '@zanix/datamaster/observability'
 export type { DefaultResponse, LoggerFunctionOptions } from '@zanix/types'
@@ -64,20 +70,20 @@ export type { DefaultResponse, LoggerFunctionOptions } from '@zanix/types'
  * here so a team that wants both roles (this service's own business API, plus the centralized
  * admin hub) in the same process can do so via `@zanix/core` alone, without a separate import.
  *
- * `ZanixAdmin.start()` and `Zanix.start()` both resolve their own public REST server's port from
+ * `ZanixAdminHub.start()` and `Zanix.start()` both resolve their own public REST server's port from
  * the same env-var fallback chain — calling both in the same process without passing distinct
  * ports to at least one of them will fail with `AddrInUse`. See `@zanix/admin`'s own docs for
- * `ZanixAdmin.start`'s options.
+ * `ZanixAdminHub.start`'s options.
  *
- * Never enable `Zanix.start()`'s own `admin` option in the same process as `ZanixAdmin.start()` —
+ * Never enable `Zanix.start()`'s own `admin` option in the same process as `ZanixAdminHub.start()` —
  * both would independently register `@zanix/admin` metadata (this service's own triggers/templates/
- * service-token routes here, `ZanixAdmin`'s own triggers-proxy/templates-store routes there —
+ * service-token routes here, `ZanixAdminHub`'s own triggers-proxy/templates-store routes there —
  * they're deliberately different route sets, see `docs/admin-apis.md`'s "Architecture" section)
  * against the same shared registry; a runtime guard throws an `InternalError` if you do. Leave
- * `admin` at its default (`false`) when also running `ZanixAdmin.start()` — see
+ * `admin` at its default (`false`) when also running `ZanixAdminHub.start()` — see
  * `docs/admin-apis.md`.
  */
-export { default as ZanixAdmin } from '@zanix/admin'
+export { default as ZanixAdminHub } from '@zanix/admin'
 
 /**
  * Class representing the Zanix server management.
@@ -117,13 +123,14 @@ export default class Zanix {
    *
    * @static
    * @function
-   * @param {SetupOptions} options - An optional object with two independent keys:
-   *   - `server`: per-web-server-type (`rest`/`graphql`/`socket`) partial configuration for this
-   *     service's own public server(s), each accepting an optional `onCreate` callback invoked
-   *     with the server `id` once it's created.
-   *   - `admin`: enables and configures `@zanix/admin`'s built-in triggers/templates/service-token
-   *     server(s) alongside the public one(s) above. Disabled (`false`) by default — see
-   *     {@link SetupOptions} and `docs/admin-apis.md` for the full shape.
+   * @param {SetupOptions} options - An optional object:
+   *   - `server`/`rootDir`: per-web-server-type (`rest`/`graphql`/`socket`) partial configuration
+   *     and auto-discovery root(s) for this service's own main app, each server type accepting an
+   *     optional `onCreate` callback invoked with the server `id` once it's created.
+   *   - `admin`: enables and configures `@zanix/admin`'s built-in triggers/templates/
+   *     service-token server(s) — disabled (`false`) by default.
+   *   - `apps`: named secondary apps bootstrapped alongside the main one, each on its own
+   *     Application. See {@link SetupOptions} and `docs/admin-apis.md` for the full shape.
    */
   public static bootstrap: typeof start = start
 

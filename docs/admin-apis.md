@@ -6,6 +6,13 @@ reachable through the public `server` options) that exposes three built-in APIs.
 ["Pinning a stable address"](#pinning-a-stable-address-admin_server_id) below — and a plain,
 unprefixed server otherwise; there is no auto-generated anchored id.
 
+See `SetupOptions.apps`'s own JSDoc for named secondary apps beyond the main one — `'admin'` (like
+`'main'`) is a reserved `apps` key and throws if used there; it's configured exclusively via this
+top-level `admin` option. `admin` may safely be enabled together with `ZanixAdminHub.start()` in the
+same process — see [`./admin-architecture.md`](./admin-architecture.md#running-both-servers) for why
+these two independent route sets never corrupt each other's registration, even fired without a
+sequential `await` between them.
+
 - **`/admin/triggers`** — manage `@zanix/datamaster`'s persisted trigger configurations at runtime,
   without a redeploy. Always registered (the underlying `datamaster` module is on by default; set
   `TRIGGERS_MODEL_NAME=false` to disable both). Its underlying service/repository
@@ -57,8 +64,11 @@ Passing an object uses the exact same shape as the top-level `server` option —
 `bootstrapServers` accepts per type (`rest`/`graphql`/`socket`) works here too, **except
 `application`**: an admin sub-server is always bound to the `'admin'` Application (see
 `@zanix/server`'s `docs/HANDLERS.md#applications`), so passing it is a type error rather than a
-silently overridden value. `id`/`previousId` are accepted, but this bootstrap always resolves them
-itself from `ADMIN_SERVER_ID`/`ADMIN_SERVER_ID_PREVIOUS` regardless of what's passed here — see
+silently overridden value. An explicit `id`/`previousId` here always wins over the
+`ADMIN_SERVER_ID`/`ADMIN_SERVER_ID_PREVIOUS` env vars — same "explicit option beats env var"
+precedence every other Zanix option follows; omit them to fall back to the env-derived value
+instead, same as before. Useful to run more than one admin-enabled instance of this service
+distinguishably, without relying on a single process-wide env var to tell them apart. See
 ["Pinning a stable address"](#pinning-a-stable-address-admin_server_id) below.
 
 ### Ports and single-port platforms (Heroku, Render, Railway, …)
@@ -147,7 +157,8 @@ into that same `'admin'` Application (via `ProgramModule.defineApplication('admi
 own purposes; those share the same bucket described below. If you want a separate, non-default
 Application server for your _own_ routes without `@zanix/admin`'s, register them under a different
 Application name and call `bootstrapServers({ ..., application: 'your-name' })` directly rather than
-going through `admin`.
+going through `admin` — or register it as another named entry of `apps` itself (see
+`AppBootstrapOptions`), which does the same `defineApplication`/`bootstrapServers` wiring for you.
 
 **Caveat: `'admin'` is not exclusively reserved for this package.** `@zanix/server` keeps exactly
 one route bucket per Application name per server type (`rest`/`graphql`/`socket`) — every capability
@@ -161,9 +172,9 @@ time yourself. See `@zanix/server`'s `docs/HANDLERS.md` "Applications" section f
 mechanism.
 
 See [`./admin-architecture.md`](./admin-architecture.md) for how this service's own admin API
-relates to the centralized `ZanixAdmin` orchestrator — two independent HTTP servers, not two "modes"
-of the same one — including the triggers-proxy-vs-templates-storage distinction, running both in one
-process, and standing up `ZanixAdmin` alongside this service.
+relates to the centralized `ZanixAdminHub` orchestrator — two independent HTTP servers, not two
+"modes" of the same one — including the triggers-proxy-vs-templates-storage distinction, running
+both in one process, and standing up `ZanixAdminHub` alongside this service.
 
 ### Roles and authentication
 
@@ -219,9 +230,11 @@ ADMIN_SERVER_ID=custom-billing
 
 Each admin sub-server (REST/GraphQL/socket) gets its own suffixed id so the three never collide,
 even if two are ever configured onto the same port. Leave it unset unless something external
-actually needs to reach this service's admin API at a fixed address. `ZanixAdmin.start()` reads the
-same env var, the same way — both go through the same `resolveAdminServerId` helper in
-`@zanix/server`, so this is consistent regardless of which entrypoint you use.
+actually needs to reach this service's admin API at a fixed address. `ZanixAdminHub.start()` pins
+its own address the same way, via its own `ADMIN_HUB_SERVER_ID` env var (distinct from this one, so
+both can be anchored at once without colliding on the same prefix if they ever share a port) — both
+go through the same generic `resolveApplicationServerId` helper in `@zanix/server`, so the mechanism
+is consistent regardless of which entrypoint you use, even though the env var name differs.
 
 **There is no discovery mechanism for the id, by design, and none is planned.** Since reachability
 is always opt-in via pinning, never bootstrapped at runtime, no legitimate caller — internal or
@@ -249,6 +262,41 @@ close the window. Not supported for the admin GraphQL sub-server specifically (r
 for a second prefix would compile an empty stub instead of the real one) — the REST/socket admin
 sub-servers rotate independently of that limitation.
 
+## The `codeTemplatesDiscovery` option
+
+Separate from everything above: exposes this service's own **in-code** notification templates
+(`@zanix/notifications`'s `CODE_TEMPLATES` — the `.hbs` catalog compiled from source, not anything
+persisted in a database) under `/.well-known/zanix/code-templates`, so an external central
+Notification/Template Service can pull them as seed data. Wraps `@zanix/notifications`'s own
+`defineCodeTemplatesDiscovery()`.
+
+```ts
+Zanix.start({
+  codeTemplatesDiscovery: true, // or an object to override guards/application
+})
+```
+
+**Disabled by default, and deliberately independent of `TEMPLATES_SERVICE_URL`** (Mode C — see
+`@zanix/notifications`'s `docs/templates.md#mode-c-remote-only-templates`). Consuming templates from
+a remote source doesn't imply agreeing to expose your own catalog back: the remote source might not
+even be Zanix-based, and `RemoteTemplateBackend`'s own sync-pull trigger
+(`POST admin/templates/sync`) is already best-effort — it catches and logs its own failure, never a
+hard requirement for Mode C to keep working. Enable this explicitly only once you actually want some
+external service to pull from you.
+
+- `true` guards it with `@zanix/auth`'s
+  `jwtValidationGuard({ permissions: [ADMIN_ROLE,
+  ADMIN_TEMPLATES_ROLE] })` — the same role that
+  already protects `/.well-known/zanix/templates` (the DB-backed templates Discovery `admin`
+  composes), so one role consistently gates every templates-shaped Discovery surface.
+- An object form (`CodeTemplatesDiscoveryOptions`) overrides `guards` (pass `[]` to deliberately
+  serve it unauthenticated — never omitted silently) and/or `application`.
+- **Application**: defaults to `'admin'` when the top-level `admin` option is also enabled —
+  matching where `ZANIX_ADMIN_SERVICES`'s `adminBaseUrl` conventionally points once anchored — or
+  the default Application otherwise. `admin` disabled means no server backs the `'admin'`
+  Application at all; registering under it in that case would leave the route live in metadata but
+  never actually served.
+
 ## Building a custom admin API instead of the built-in one
 
 If the built-in `/admin/triggers`/`/admin/templates` routes don't fit (different auth, a different
@@ -269,8 +317,8 @@ duplicating it:
 ## See also
 
 - [`./admin-architecture.md`](./admin-architecture.md) — how this service's own admin API relates to
-  the centralized `ZanixAdmin` orchestrator, calling another service's admin API remotely
-  (`TriggersAdminClient`/`TemplatesAdminClient`), and standing up `ZanixAdmin` alongside this
+  the centralized `ZanixAdminHub` orchestrator, calling another service's admin API remotely
+  (`TriggersAdminClient`/`TemplatesAdminClient`), and standing up `ZanixAdminHub` alongside this
   service.
 - [`../README.md`](../README.md) — package overview, installation, and basic usage.
 - `@zanix/admin`'s own README — the domain owner for the roles, protocol, and client/service classes

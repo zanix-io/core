@@ -1,4 +1,4 @@
-import { collectFiles, getRootDir } from '@zanix/helpers'
+import { collectFiles, getRootDir } from '@zanix/helpers/files'
 import { ZANIX_SERVER_MODULES } from '@zanix/server'
 import { setTaskerUrl } from '@zanix/asyncmq/worker'
 import { join } from '@std/path'
@@ -18,7 +18,7 @@ export const registerWorkerTaskerUrl = (): void => {
 }
 
 export const defineLocalMetadata = async (
-  dir = '.',
+  dir: string | string[] = '.',
   types = ZANIX_SERVER_MODULES,
 ) => {
   const imports: Promise<unknown>[] = []
@@ -62,10 +62,8 @@ export const defineCoreMetadata = async () => {
  * `ADMIN_TRIGGERS_APPLICATION`/`ADMIN_TEMPLATES_APPLICATION` rebinding env vars) now lives in
  * `@zanix/admin`'s own `defineAdminMetadata()`, which this thin wrapper delegates to — see that
  * package's own JSDoc and README ("Admin APIs" section) for the full behavior, and
- * `docs/admin-apis.md` for this env vars' externally-facing documentation. `'core'` identifies this
- * package as the caller to `guardSingleAdminRegistration` (see `@zanix/admin`'s own doc) — the same
- * protection that stops `ZanixAdmin.start()` from registering in the same process.
+ * `docs/admin-apis.md` for this env vars' externally-facing documentation.
  */
 export const defineAdminMetadata = async (): Promise<void> => {
-  await defineAdminControllers('core')
+  await defineAdminControllers()
 }
