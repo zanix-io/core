@@ -36,6 +36,7 @@
     "jsr:@std/path@^1.1.5": "1.1.6",
     "jsr:@std/streams@~0.224.5": "0.224.5",
     "jsr:@std/testing@1.0.9": "1.0.9",
+    "jsr:@zanix/admin@1": "1.0.0",
     "jsr:@zanix/asyncmq@0.5": "0.5.0",
     "jsr:@zanix/auth@0.6": "0.6.0",
     "jsr:@zanix/datamaster@1": "1.1.0",
@@ -43,7 +44,6 @@
     "jsr:@zanix/notifications@0.3": "0.3.0",
     "jsr:@zanix/server@3": "3.1.0",
     "jsr:@zanix/server@^3.1.0": "3.1.0",
-    "jsr:@zanix/utils@*": "2.4.5",
     "jsr:@zanix/utils@2": "2.4.5",
     "jsr:@zanix/utils@2.4": "2.4.5",
     "jsr:@zanix/utils@^2.4.5": "2.4.5",
@@ -54,8 +54,7 @@
     "npm:handlebars@^4.7.8": "4.7.9",
     "npm:javascript-obfuscator@^4.0.2": "4.2.2",
     "npm:mongoose@8": "8.24.2",
-    "npm:redis@^5.9.0": "5.12.1",
-    "npm:zod@^4.1.13": "4.4.3"
+    "npm:redis@^5.9.0": "5.12.1"
   },
   "jsr": {
     "@db/sqlite@0.12.0": {
@@ -195,6 +194,16 @@
         "jsr:@std/path@^1.0.8"
       ]
     },
+    "@zanix/admin@1.0.0": {
+      "integrity": "8ed7c337ea2a313a405b7915a8bb88d06f111d3f47639e4a913c292d6d90fc94",
+      "dependencies": [
+        "jsr:@zanix/auth",
+        "jsr:@zanix/datamaster@^1.1.0",
+        "jsr:@zanix/notifications",
+        "jsr:@zanix/server@^3.1.0",
+        "jsr:@zanix/utils@^2.4.5"
+      ]
+    },
     "@zanix/asyncmq@0.5.0": {
       "integrity": "d9089beda5e070dc1dc993cda77d5bf5fae05dfca0a8aae69f8324c7d20ee869",
       "dependencies": [
@@ -229,8 +238,7 @@
         "jsr:@zanix/datamaster@1",
         "jsr:@zanix/server@3",
         "jsr:@zanix/utils@2",
-        "npm:handlebars",
-        "npm:zod"
+        "npm:handlebars"
       ]
     },
     "@zanix/server@3.1.0": {
@@ -1240,9 +1248,6 @@
     },
     "wordwrap@1.0.0": {
       "integrity": "sha512-gvVzJFlPycKc5dZN4yPkP8w7Dc37BtP1yczEneOb4uq34pXZcvrtRTmWV8W+Ume+XCxKgbjM+nevkyFPMybd4Q=="
-    },
-    "zod@4.4.3": {
-      "integrity": "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="
     }
   },
   "workspace": {
@@ -1250,26 +1255,13 @@
       "jsr:@std/assert@0.224",
       "jsr:@std/path@0.224",
       "jsr:@std/testing@1.0.9",
+      "jsr:@zanix/admin@1",
       "jsr:@zanix/asyncmq@0.5",
       "jsr:@zanix/auth@0.6",
       "jsr:@zanix/datamaster@^1.1.0",
       "jsr:@zanix/notifications@0.3",
       "jsr:@zanix/server@3",
       "jsr:@zanix/utils@^2.4.5"
-    ],
-    "links": {
-      "jsr:@zanix/admin@1.0.0": {
-        "dependencies": [
-          "jsr:@std/assert@0.224",
-          "jsr:@std/path@0.224",
-          "jsr:@std/testing@1.0.9",
-          "jsr:@zanix/auth@0.6",
-          "jsr:@zanix/datamaster@^1.1.0",
-          "jsr:@zanix/notifications@0.3",
-          "jsr:@zanix/server@^3.1.0",
-          "jsr:@zanix/utils@^2.4.5"
-        ]
-      }
-    }
+    ]
   }
 }
