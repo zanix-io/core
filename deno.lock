@@ -40,6 +40,7 @@
     "jsr:@zanix/datamaster@^1.3.0": "1.3.0",
     "jsr:@zanix/notifications@0.4": "0.4.0",
     "jsr:@zanix/server@^3.2.0": "3.2.0",
+    "jsr:@zanix/utils@*": "2.6.0",
     "jsr:@zanix/utils@^2.6.0": "2.6.0",
     "npm:@types/amqplib@0.10": "0.10.8",
     "npm:amqplib@0.10": "0.10.9",
@@ -187,7 +188,7 @@
         "jsr:@zanix/datamaster",
         "jsr:@zanix/notifications",
         "jsr:@zanix/server",
-        "jsr:@zanix/utils"
+        "jsr:@zanix/utils@^2.6.0"
       ]
     },
     "@zanix/app@0.1.0": {
@@ -198,7 +199,7 @@
         "jsr:@zanix/auth",
         "jsr:@zanix/datamaster",
         "jsr:@zanix/server",
-        "jsr:@zanix/utils"
+        "jsr:@zanix/utils@^2.6.0"
       ]
     },
     "@zanix/asyncmq@0.6.0": {
@@ -206,7 +207,7 @@
       "dependencies": [
         "jsr:@zanix/datamaster",
         "jsr:@zanix/server",
-        "jsr:@zanix/utils",
+        "jsr:@zanix/utils@^2.6.0",
         "npm:@types/amqplib",
         "npm:amqplib"
       ]
@@ -215,7 +216,7 @@
       "integrity": "5e27f2b4bb7bc603eb3dabaf796127576d5e5442499815566b09d04bd03eb966",
       "dependencies": [
         "jsr:@zanix/server",
-        "jsr:@zanix/utils"
+        "jsr:@zanix/utils@^2.6.0"
       ]
     },
     "@zanix/datamaster@1.3.0": {
@@ -223,7 +224,7 @@
       "dependencies": [
         "jsr:@db/sqlite",
         "jsr:@zanix/server",
-        "jsr:@zanix/utils",
+        "jsr:@zanix/utils@^2.6.0",
         "npm:mongoose",
         "npm:redis"
       ]
@@ -234,7 +235,7 @@
         "jsr:@zanix/auth",
         "jsr:@zanix/datamaster",
         "jsr:@zanix/server",
-        "jsr:@zanix/utils",
+        "jsr:@zanix/utils@^2.6.0",
         "npm:handlebars",
         "npm:zod"
       ]
@@ -245,7 +246,7 @@
         "jsr:@std/http",
         "jsr:@std/path@0.224",
         "jsr:@zanix/server",
-        "jsr:@zanix/utils",
+        "jsr:@zanix/utils@^2.6.0",
         "npm:graphql",
         "npm:redis"
       ]
