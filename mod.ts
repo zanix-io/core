@@ -55,14 +55,14 @@ export {
 export type { ConfigOptions } from 'typings/config.ts'
 export type {
   AdminBootstrapServerOptions,
-  AppBootstrapOptions,
   AppsOptions,
   CodeTemplatesDiscoveryOptions,
   SetupOptions,
+  ZanixAppBootstrapOptions,
 } from 'typings/setup.ts'
 export type { ErrorLogThrottleConfig, ErrorLogThrottleStore, WebServerTypes } from '@zanix/server'
 export type { ElasticsearchLogSaveOptions } from '@zanix/datamaster/observability'
-export type { DefaultResponse, LoggerFunctionOptions } from '@zanix/types'
+export type { DefaultResponse, LoggerFormatter, LoggerFunctionOptions } from '@zanix/types'
 
 /**
  * `@zanix/admin`'s reference deployable entrypoint — the centralized orchestrator that aggregates
@@ -75,13 +75,15 @@ export type { DefaultResponse, LoggerFunctionOptions } from '@zanix/types'
  * ports to at least one of them will fail with `AddrInUse`. See `@zanix/admin`'s own docs for
  * `ZanixAdminHub.start`'s options.
  *
- * Never enable `Zanix.start()`'s own `admin` option in the same process as `ZanixAdminHub.start()` —
- * both would independently register `@zanix/admin` metadata (this service's own triggers/templates/
- * service-token routes here, `ZanixAdminHub`'s own triggers-proxy/templates-store routes there —
- * they're deliberately different route sets, see `docs/admin-apis.md`'s "Architecture" section)
- * against the same shared registry; a runtime guard throws an `InternalError` if you do. Leave
- * `admin` at its default (`false`) when also running `ZanixAdminHub.start()` — see
- * `docs/admin-apis.md`.
+ * Safe to also enable `Zanix.start()`'s own `admin` option in the same process as
+ * `ZanixAdminHub.start()` — there is no runtime guard against this, and none is needed: the two
+ * register `@zanix/admin` metadata under distinct Applications (this service's own triggers/
+ * templates/service-token routes under `ADMIN_APPLICATION`, `ZanixAdminHub`'s own triggers-proxy/
+ * templates-store routes under its own `ADMIN_HUB_APPLICATION` — deliberately different route sets,
+ * see `docs/admin-apis.md`'s "Architecture" section), so neither's routes collide with or overwrite
+ * the other's, in either call order, even without an `await` between them. See
+ * `core/src/@tests/functional/admin-hub-coexistence*.test.ts` for the regression coverage, and
+ * `docs/admin-apis.md` for the full breakdown.
  */
 export { default as ZanixAdminHub } from '@zanix/admin'
 
@@ -93,8 +95,11 @@ export { default as ZanixAdminHub } from '@zanix/admin'
  *   logging, and `database`/`notifications` env defaults). See {@link setup}'s own doc for timing.
  * - `bootstrap` (aliased as `start`): Initializes the project's web servers and performs additional
  *   configurations. It executes classes based on their `startMode` and initializes internal servers
- *   and dependencies of the library, depending on the handlers defined in the project.
- * - `stop`: Stops all the initialized servers (kills them).
+ *   and dependencies of the library, depending on the handlers defined in the project. Also traps
+ *   `SIGINT`/`SIGTERM` automatically (no opt-out) — either signal runs `stop` before exiting,
+ *   instead of the process dying mid-request the moment an orchestrator sends its default stop
+ *   signal.
+ * - `stop`: Stops all the initialized servers (kills them), then closes connector connections.
  * - `startWorker`: Alternative entrypoint that bootstraps the process as a standalone AsyncMQ
  *   worker instead of web servers.
  * - `stopWorker`: Closes the worker's connector connections (see {@link stopWorker}'s own doc).
@@ -104,9 +109,9 @@ export default class Zanix {
    * General-purpose, cross-cutting configuration — error-log throttling and Elasticsearch/
    * OpenSearch-backed logging — separate from the HTTP/worker bootstrap itself. The
    * `errorLogThrottle`/`logger` fields are safe to call before, after, or alongside
-   * {@link start}/{@link startWorker}; the `database`/`notifications` fields are NOT — they only
-   * take effect when called **before** {@link start}/{@link startWorker}. See {@link ConfigOptions}
-   * for what each option wires and its env-var fallback.
+   * {@link start}/{@link startWorker}; the `database`/`notifications`/`dlq` fields are NOT — they
+   * only take effect when called **before** {@link start}/{@link startWorker}. See
+   * {@link ConfigOptions} for what each option wires and its env-var fallback.
    *
    * @static
    * @function
@@ -131,6 +136,11 @@ export default class Zanix {
    *     service-token server(s) — disabled (`false`) by default.
    *   - `apps`: named secondary apps bootstrapped alongside the main one, each on its own
    *     Application. See {@link SetupOptions} and `docs/admin-apis.md` for the full shape.
+   *
+   * A successful call also registers a `SIGINT`/`SIGTERM` handler (no opt-out) that runs {@link stop}
+   * before exiting — draining in-flight HTTP requests via `Deno.serve()`'s own `.shutdown()` and
+   * closing connector connections, instead of the process dying immediately on an orchestrator's
+   * default stop signal (Docker, Kubernetes, ...).
    */
   public static bootstrap: typeof start = start
 
@@ -140,8 +150,10 @@ export default class Zanix {
   public static start: typeof start = start
 
   /**
-   * Stops all initialized servers and kills the associated processes.
-   * This method ensures that all running servers are stopped and resources are freed.
+   * Stops all initialized servers and kills the associated processes, then closes connector
+   * connections (`closeAllConnections()`) — this method ensures that all running servers are
+   * stopped and resources are freed. Also called automatically on `SIGINT`/`SIGTERM` if
+   * {@link bootstrap} registered a handler for them.
    *
    * @static
    * @function
@@ -162,7 +174,8 @@ export default class Zanix {
 
   /**
    * Closes all connector connections initialized by the worker process. Does not terminate the
-   * process itself — {@link startWorker}'s own process only exits via its `SIGINT` handler.
+   * process itself — {@link startWorker}'s own process only exits via its `SIGINT`/`SIGTERM`
+   * handler.
    *
    * @static
    * @function

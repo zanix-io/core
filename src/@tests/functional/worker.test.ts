@@ -35,7 +35,10 @@ Deno.test({
         }, 10000)
       })
 
-      assert(sigintHandler, 'SIGINT listener should have been registered by startWorker')
+      assert(
+        sigintHandler,
+        'SIGINT listener should have been registered by startWorker',
+      )
       await sigintHandler?.()
       await workerPromise
 

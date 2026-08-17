@@ -24,7 +24,7 @@ import logger from '@zanix/logger'
  *   `@zanix/notifications`'s SMTP connector, in the worker process too, not just the main server
  *   process), the project's own connector/interactor/handler/defs files
  *   ({@link defineLocalMetadata}), then `onSetup`/`onBoot`/`postBoot` and metadata cleanup.
- * - Keeps the process alive until a `SIGINT` is received.
+ * - Keeps the process alive until a `SIGINT`/`SIGTERM` is received.
  *
  * @static
  * @function
@@ -39,25 +39,33 @@ export const startWorker: () => Promise<void> = async () => {
   registerWorkerTaskerUrl()
   await registerExtraProcessQueues()
   await initWorkerEntrypoint(async () => {
-    await defineLocalMetadata('.', workerFileTypes())
     await defineCoreMetadata()
+    await defineLocalMetadata('.', workerFileTypes())
   })
 
   logger.success('External worker initialized...')
 
   await new Promise<void>((resolve) => {
-    Deno.addSignalListener('SIGINT', async () => {
+    const shutdown = async () => {
       logger.info('Closing external worker...', 'noSave')
+
+      Deno.removeSignalListener('SIGINT', shutdown)
+      Deno.removeSignalListener('SIGTERM', shutdown)
+
       await closeAllConnections()
       resolve()
       Deno.exit(0)
-    })
+    }
+
+    Deno.addSignalListener('SIGINT', shutdown)
+    Deno.addSignalListener('SIGTERM', shutdown)
   })
 }
 
 /**
  * Closes all connector connections initialized by the worker process. Does not terminate the
- * process itself — {@link startWorker}'s own process only exits via its `SIGINT` handler.
+ * process itself — {@link startWorker}'s own process only exits via its `SIGINT`/`SIGTERM`
+ * handler.
  *
  * @static
  * @function

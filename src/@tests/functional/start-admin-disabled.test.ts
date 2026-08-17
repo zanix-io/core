@@ -16,7 +16,9 @@ Deno.test({
 
     let mainServerId: string | undefined
 
-    await Zanix.bootstrap({ server: { rest: { onCreate: (id) => (mainServerId = id) } } })
+    await Zanix.bootstrap({
+      server: { rest: { onCreate: (id) => (mainServerId = id) } },
+    })
     await new Promise((resolve) => setTimeout(resolve, 1000)) // wait for mongo/redis core connect
 
     assert(mainServerId, 'the main REST server should have been created')
@@ -25,9 +27,12 @@ Deno.test({
 
     // `/admin/service-token` always exists once `defineAdminMetadata()` runs — a 404 here proves
     // it never did, i.e. no admin server/metadata was registered at all.
-    const res = await fetch(`http://${addr.hostname}:${addr.port}/api/admin/service-token`, {
-      method: 'POST',
-    })
+    const res = await fetch(
+      `http://${addr.hostname}:${addr.port}/api/admin/service-token`,
+      {
+        method: 'POST',
+      },
+    )
     assertEquals(res.status, 404)
     await res.body?.cancel()
 

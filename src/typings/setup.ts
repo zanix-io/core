@@ -1,4 +1,11 @@
-import type { BootstrapServerOptions, MiddlewareGuard, WebServerTypes } from '@zanix/server'
+import type {
+  BootstrapServerOptions,
+  HealthOptions,
+  MiddlewareGuard,
+  WebServerTypes,
+} from '@zanix/server'
+import type { ResourceBinding, RootResources, ZanixAppDefinition } from '@zanix/app'
+import type { ZanixAppServerOptions } from '@zanix/app/runtime'
 
 /**
  * Per-type config accepted by `SetupOptions.admin` — identical to `BootstrapServerOptions[K]`
@@ -9,33 +16,56 @@ import type { BootstrapServerOptions, MiddlewareGuard, WebServerTypes } from '@z
  * (same "explicit option beats env var" precedence every other Zanix option follows) — omit them
  * to fall back to the env-derived value, same as before. `previousId` is never applied for
  * `graphql` regardless of source (`compileRuntime` rejects it for that type outright).
+ *
+ * Built generically from `WebServerTypes` (`rest`/`graphql`/`socket`/`ssr`), so every type
+ * `bootstrapServers` itself accepts here type-checks — including `ssr`, even though `@zanix/admin`
+ * doesn't compose any `ssr` routes of its own today. `modules/start.ts`'s own `ADMIN_TYPES` is kept
+ * in sync with this (a compile-time check there fails if they ever diverge), so an `ssr` entry is
+ * never silently dropped: it's a no-op unless your own app also composes an `ssr` handler under the
+ * shared `'admin'` Application (see `docs/admin-apis.md`'s "Scope" section).
+ *
+ * `health` (a sibling of the per-type fields, not nested under one — see `start()`'s own doc)
+ * defaults to whatever `SetupOptions.server.health` resolves to when omitted here — the embedded
+ * admin server shares the main server's port by default, so by default it also shares its health
+ * decision; set this explicitly only to make admin's own health independent of the main app's.
  */
-export type AdminBootstrapServerOptions = Partial<
-  {
-    [K in WebServerTypes]: Omit<NonNullable<BootstrapServerOptions[K]>, 'application'>
-  }
->
+export type AdminBootstrapServerOptions =
+  & Partial<
+    {
+      [K in WebServerTypes]: Omit<
+        NonNullable<BootstrapServerOptions[K]>,
+        'application'
+      >
+    }
+  >
+  & { health?: boolean | HealthOptions }
 
 /**
- * Per-type config accepted by a named entry of `SetupOptions.apps`. There is no env-var-derived
- * `id`/`previousId` fallback here: that resolution (`ADMIN_SERVER_ID`/`ADMIN_SERVER_ID_PREVIOUS`)
- * is exclusive to the top-level `admin` option — a named app only ever uses whatever
- * `id`/`previousId`/`port` is passed explicitly in `server`.
- *
- * @property {string | string[]} [rootDir] - Directory (or directories) to auto-discover this
- * app's own handler/interactor/connector/provider/`.defs.ts` files from, scoped to its own
- * Application (named after this entry's own key in `apps`) — never mixed with the main app's or
- * any other named app's discovery. Resolved relative to the process's working directory, same as
- * the top-level `rootDir`.
- * @property {BootstrapServerOptions} [server] - Same shape as the top-level `server` option,
- * **except `application` is not accepted** — this app is always bound to its own Application
- * (named after its own key in `apps`), passing it is a type error rather than a silent override.
+ * A Zanix App (`defineZanixApp()`'s manifest) declared via a named `SetupOptions.apps` entry.
+ * This entry's own `apps` key MUST match `definition`'s own manifest `name` (an app's identity
+ * comes from its manifest, never from whatever key it happens to be registered under) —
+ * `start()` throws explicitly on a mismatch rather than silently serving nothing.
  */
-export type AppBootstrapOptions = {
-  rootDir?: string | string[]
-  server?: Partial<
-    { [K in WebServerTypes]: Omit<NonNullable<BootstrapServerOptions[K]>, 'application'> }
-  >
+export interface ZanixAppBootstrapOptions {
+  /** `defineZanixApp()`'s own return value — never the raw, un-normalized manifest object passed
+   * to it. */
+  definition: ZanixAppDefinition
+  /** Per-type server config, needed to actually SERVE this app's own routes — omit for an app
+   * that only needs jobs/resources/lifecycle, no HTTP surface at all (see `ZanixAppServerOptions`'s
+   * own doc). */
+  server?: ZanixAppServerOptions
+  /** This app's resource bindings — resolves each `dependencies` slot the manifest declared to a
+   * concrete resource from `SetupOptions.resources`. This entry's own `apps` key is the binding's
+   * `appName`; never repeated here. */
+  uses?: Array<Omit<ResourceBinding, 'appName'>>
+  /** Overrides for this app's own `behaviors` (see `@zanix/app`'s `BehaviorDeclaration` — a pure
+   * function/strategy slot, distinct from `resources`/`uses`: no construction, no `close()`, no
+   * health-gating, just a function). Each key must be a `behaviors` name the manifest itself
+   * declared — `Zanix.start()` throws (before anything else is constructed) if a key here names a
+   * behavior the app never declared, or if `apps` never declares this app at all. Unlike `uses`
+   * (which names an ALTERNATIVE RESOURCE to resolve), the replacement implementation is given
+   * directly — there's no construction step to defer. */
+  behaviors?: Record<string, (...args: never[]) => unknown>
 }
 
 /**
@@ -45,7 +75,7 @@ export type AppBootstrapOptions = {
  * — the built-in admin server is configured via the top-level `admin` option instead, not through
  * `apps` — using it as an `apps` key throws for the same reason.
  */
-export type AppsOptions = Record<string, AppBootstrapOptions>
+export type AppsOptions = Record<string, ZanixAppBootstrapOptions>
 
 /**
  * Options accepted by `SetupOptions.codeTemplatesDiscovery`'s object form.
@@ -70,10 +100,12 @@ export type CodeTemplatesDiscoveryOptions = {
 /**
  * Configuration options used to set up server instances for various web server types and bootstrap the `Zanix` project
  *
- * This type allows partial configuration of one or more supported server types: `'graphql'`, `'rest'`, and `'socket'`.
+ * This type allows partial configuration of one or more supported server types: `'graphql'`,
+ * `'rest'`, `'socket'`, and `'ssr'`.
  *
- * @property {BootstrapServerOptions} [server] - An optional object where each key is a web server type (`'graphql'`, `'rest'`, or `'socket'`),
- * and the value is a partial server configuration specific to that type.
+ * @property {BootstrapServerOptions} [server] - An optional object where each key is a web server
+ * type (`'graphql'`, `'rest'`, `'socket'`, or `'ssr'`), and the value is a partial server
+ * configuration specific to that type.
  * @property {string | string[]} [rootDir] - Base directory (or directories) to auto-discover this
  * app's own handler/interactor/connector/provider/`.defs.ts` files from (see `@zanix/server`'s
  * `ZANIX_SERVER_MODULES`), resolved relative to the process's working directory. Defaults to
@@ -88,24 +120,36 @@ export type CodeTemplatesDiscoveryOptions = {
  * See `docs/admin-apis.md` for the full breakdown; in short:
  *   - `undefined` / `false` (default): no admin metadata is registered and no admin server boots
  *     at all. Run `ZanixAdminHub.start()` as its own standalone deployment instead if you need these
- *     routes without embedding them in this process — never both in the same process (a runtime
- *     guard throws if you do, whenever `admin` is actually enabled on this side and
- *     `ZanixAdminHub.start()` also runs, in either order).
- *   - `true`: enabled. Each type (`rest`/`graphql`/`socket`) defaults to the same port `server`'s
- *     own config resolves to for that type, sharing one listener — unless `PORT`/`PORT_<TYPE>`
- *     says otherwise, which applies uniformly to both (see `@zanix/server`'s `bootstrapServers`).
+ *     routes without embedding them in this process. There is no runtime guard against also calling
+ *     `ZanixAdminHub.start()` in THIS same process, regardless of whether `admin` is enabled here —
+ *     the two are genuinely safe to coexist, in either order, even without an `await` between them:
+ *     this option's own local admin CRUD lives under `ADMIN_APPLICATION`, `ZanixAdminHub`'s central
+ *     aggregator/proxy lives under its own, distinct `ADMIN_HUB_APPLICATION` — two separate
+ *     Applications whose routes never collide (see `@zanix/admin`'s own `start()` doc, and
+ *     `core/src/@tests/functional/admin-hub-coexistence*.test.ts` for the regression coverage).
+ *   - `true`: enabled. Each type (`rest`/`graphql`/`socket`/`ssr`) defaults to the same port
+ *     `server`'s own config resolves to for that type, sharing one listener — unless
+ *     `PORT`/`PORT_<TYPE>` says otherwise, which applies uniformly to both (see `@zanix/server`'s
+ *     `bootstrapServers`). `@zanix/admin` doesn't compose any `ssr` routes of its own, so
+ *     `admin.ssr` is only useful if your own app also composes an `ssr` handler under the shared
+ *     `'admin'` Application.
  *   - `AdminBootstrapServerOptions`: enabled, explicit per-type config, same shape as `server`
  *     **except `application` is not accepted** — an admin sub-server is always bound to the
  *     `'admin'` Application; passing it is a type error rather than a silent override. An explicit
  *     `admin.<type>.port` gets that type its own separate port instead of sharing. `id`/
  *     `previousId` here have an env-var-derived fallback (`ADMIN_SERVER_ID`/
  *     `ADMIN_SERVER_ID_PREVIOUS`) — see `AdminBootstrapServerOptions`'s own doc for the precedence.
- * @property {AppsOptions} [apps] - Named secondary apps bootstrapped alongside the main one, each
- * on its own Application (see `@zanix/server`'s `docs/HANDLERS.md#applications`) so their
- * routes/resolvers never leak onto the main app's or each other's. Bootstrapped in declaration
- * order, sequentially — never concurrently — before the main app's own (finalizing) bootstrap. See
- * `AppBootstrapOptions`. `'main'`/`'admin'` are reserved keys (the main app is configured via the
- * top-level `server`/`rootDir`, the admin server via the top-level `admin`) and throw if used here.
+ * @property {AppsOptions} [apps] - Named secondary Zanix Apps (`defineZanixApp()` manifests)
+ * bootstrapped alongside the main one, each on its own Application (see `@zanix/server`'s
+ * `docs/HANDLERS.md#applications`) so their routes/resolvers never leak onto the main app's or
+ * each other's. Resolved as one batch (`@zanix/app/runtime`'s `activateApps`, so apps sharing a
+ * root resource — see `resources` below — resolve to the same instance), then served
+ * individually per entry that declares its own `server`. See `ZanixAppBootstrapOptions`.
+ * `'main'`/`'admin'` are reserved keys (the main app is configured via the top-level
+ * `server`/`rootDir`, the admin server via the top-level `admin`) and throw if used here.
+ * @property {RootResources} [resources] - Root-level resources (e.g. a shared `mongo`/`redis`
+ * connector) that a Zanix App declared in `apps` can bind its own `dependencies` slots to, via
+ * that entry's own `uses` (see `ZanixAppBootstrapOptions`).
  * @property {boolean | CodeTemplatesDiscoveryOptions} [codeTemplatesDiscovery] - Exposes this
  * process's own in-code notification templates (`@zanix/notifications`'s `CODE_TEMPLATES`) under
  * `/.well-known/zanix/code-templates`, via `defineCodeTemplatesDiscovery()`. **Disabled by
@@ -124,5 +168,6 @@ export type SetupOptions = {
   rootDir?: string | string[]
   admin?: boolean | AdminBootstrapServerOptions
   apps?: AppsOptions
+  resources?: RootResources
   codeTemplatesDiscovery?: boolean | CodeTemplatesDiscoveryOptions
 }

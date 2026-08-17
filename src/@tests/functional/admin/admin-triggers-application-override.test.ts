@@ -45,7 +45,10 @@ Deno.test({
     const restServers = defaultServers
       .map((id) => webServerManager.info(id as never))
       .filter((info) => info.type === 'rest')
-    assert(restServers.length > 0, "a default Application's REST server should have started")
+    assert(
+      restServers.length > 0,
+      "a default Application's REST server should have started",
+    )
 
     // Default `globalPrefix` for an unanchored REST server with no explicit options is `api`.
     await Promise.all(restServers.map(async (info) => {

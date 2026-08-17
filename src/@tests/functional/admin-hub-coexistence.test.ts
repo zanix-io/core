@@ -40,9 +40,15 @@ Deno.test({
     // Deliberately NOT awaited between the two calls — mirrors the reported bug's exact repro:
     // both sequences register/boot concurrently, interleaved by the event loop.
     const corePromise = Zanix.bootstrap({
-      admin: { rest: { port: ADMIN_PORT, onCreate: (id) => (adminServerId = id) } },
+      admin: {
+        rest: { port: ADMIN_PORT, onCreate: (id) => (adminServerId = id) },
+      },
       server: {
-        rest: { port: MAIN_PORT, globalPrefix: 'auth', onCreate: (id) => (mainServerId = id) },
+        rest: {
+          port: MAIN_PORT,
+          globalPrefix: 'auth',
+          onCreate: (id) => (mainServerId = id),
+        },
       },
     })
     const hubPromise = ZanixAdminHub.start({
@@ -60,12 +66,17 @@ Deno.test({
       const mainAddr = webServerManager.info(mainServerId as never).addr
       assert(mainAddr, 'the main REST server should be listening')
       assertEquals(mainAddr.port, MAIN_PORT)
-      const welcome = await fetch(`http://${mainAddr.hostname}:${mainAddr.port}/auth/welcome`)
+      const welcome = await fetch(
+        `http://${mainAddr.hostname}:${mainAddr.port}/auth/welcome`,
+      )
       assertEquals(welcome.status, 200)
       await welcome.body?.cancel()
 
       // The embedded local admin's own route (`/admin/service-token`, always registered).
-      assert(adminServerId, 'the embedded admin REST server should have been created')
+      assert(
+        adminServerId,
+        'the embedded admin REST server should have been created',
+      )
       const adminAddr = webServerManager.info(adminServerId as never).addr
       assert(adminAddr, 'the embedded admin REST server should be listening')
       assertEquals(adminAddr.port, ADMIN_PORT)
@@ -83,7 +94,10 @@ Deno.test({
 
       // ZanixAdminHub's own aggregator route — the route that was silently dropped in the
       // reported bug.
-      assert(hubServerId, 'the ZanixAdminHub REST server should have been created')
+      assert(
+        hubServerId,
+        'the ZanixAdminHub REST server should have been created',
+      )
       const hubAddr = webServerManager.info(hubServerId as never).addr
       assert(hubAddr, 'the ZanixAdminHub REST server should be listening')
       assertEquals(hubAddr.port, HUB_PORT)
@@ -113,7 +127,10 @@ Deno.test({
     const adminServers = await ZanixAdminHub.start()
     await new Promise((resolve) => setTimeout(resolve, 1000)) // wait for mongo/redis core connect
 
-    assert(adminServers.length, 'ZanixAdminHub.start() should have started at least one server')
+    assert(
+      adminServers.length,
+      'ZanixAdminHub.start() should have started at least one server',
+    )
 
     await ZanixAdminHub.stop()
     Zanix.stop()

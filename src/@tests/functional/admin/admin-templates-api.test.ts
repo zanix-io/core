@@ -51,7 +51,9 @@ Deno.test({
       // `@zanix/admin`'s own `defineAdminMetadata()` also registers a read-only Discovery endpoint
       // alongside the CRUD one — proves it's reachable (auth-gated, same as CRUD) on the same admin
       // server, not just that registering it didn't throw.
-      const discoveryUnauthenticated = await fetch(`${baseUrl}/.well-known/zanix/templates`)
+      const discoveryUnauthenticated = await fetch(
+        `${baseUrl}/.well-known/zanix/templates`,
+      )
       assertEquals(discoveryUnauthenticated.status, 401)
       await discoveryUnauthenticated.body?.cancel()
 
@@ -65,7 +67,9 @@ Deno.test({
           assertEquals(res.status, 404)
           await res.body?.cancel()
 
-          const discoveryRes = await fetch(`${publicUrl}/.well-known/zanix/templates`)
+          const discoveryRes = await fetch(
+            `${publicUrl}/.well-known/zanix/templates`,
+          )
           assertEquals(discoveryRes.status, 404)
           await discoveryRes.body?.cancel()
         })

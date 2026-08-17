@@ -16,13 +16,14 @@ import { defineCoreMetadata, defineLocalMetadata } from 'utils/metadata.ts'
 
 registerInternalProcess()
 await initWorkerEntrypoint(async () => {
-  await defineLocalMetadata('.', workerFileTypes())
   await defineCoreMetadata()
+  await defineLocalMetadata('.', workerFileTypes())
 })
 
 /**
  * Executes a single dispatched task inside this worker thread — forwards directly to
  * `@zanix/asyncmq`'s own `processor` (re-exported here as `baseProcessor`).
  */
-export const processor = (options: ProcessorOptions): ReturnType<typeof baseProcessor> =>
-  baseProcessor(options)
+export const processor = (
+  options: ProcessorOptions,
+): ReturnType<typeof baseProcessor> => baseProcessor(options)

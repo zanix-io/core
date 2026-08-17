@@ -7,6 +7,125 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-17
+
+### Added
+
+- **`SetupOptions.resources`** — root-level resources a named Zanix App's own `dependencies` can
+  bind against, via that entry's own `uses` (see `ZanixAppBootstrapOptions`).
+- **`ZanixAppBootstrapOptions.behaviors`** — overrides for a named `apps.<name>` entry's own
+  `behaviors` (see `@zanix/app`'s new `AppDefinition.behaviors`/`ctx.behavior(name)`): a pure
+  function/strategy slot, distinct from `resources`/`uses` (no construction, no `close()`, no
+  health-gating — just a function). Each key must be a `behaviors` name that app's own manifest
+  declared; `Zanix.start()` throws, before anything else is constructed, if a key names a behavior
+  the app never declared or if `apps` never declares that app at all — same fail-fast posture `uses`
+  already has for an unknown `dependencies` slot.
+  ```ts
+  await Zanix.start({
+    apps: {
+      billing: {
+        definition: billingApp,
+        behaviors: { calculateDiscount: (order) => order.total * 0.1 },
+      },
+    },
+  })
+  ```
+  Requires a `@zanix/app` version with `behaviors`/`ctx.behavior()` support (not yet released as of
+  this entry — see that package's own CHANGELOG).
+- **`Zanix.start({admin: true})` now also activates `@zanix/admin`'s local Triggers/Templates
+  `operations`/`mcp` sub-apps** (`getLocalAdminSubApps()` — `admin-triggers`/`admin-templates`,
+  physically separated from `defineLocalAdminApp` into their own Zanix Apps this release — see
+  `@zanix/admin`'s own CHANGELOG), each bootstrapped with its own `bootstrapAppServer()` call so
+  their own `/__zanix-ops/<name>/...` operations-dispatch route is reachable over real HTTP, not
+  just same-process `ctx.remote()`. Always activated regardless of `TRIGGERS_MODEL_NAME`/
+  `DATABASE_TEMPLATES` (the REST-controller gating in `defineAdminMetadata`), same as before this
+  rename. `ctx.remote('admin-triggers')`/`ctx.remote('admin-templates')` reach them now, not
+  `ctx.remote('admin')` — safe, since this surface was only ever exercised by tests, never a real
+  external caller.
+- **`admin.health`** — mirrors `@zanix/server`'s new `server.health` for the embedded admin server:
+  `boolean | HealthOptions`, own explicit value if given, otherwise inherits whatever
+  `server.health` resolves to (same "explicit option beats inherited default" precedence `port`/
+  `id`/`previousId` already follow for admin). Fixes a real bug found running a real consumer app:
+  the embedded admin server previously always got `health: undefined` (enabled with defaults) —
+  `server.health` (even `false`) had zero effect on it, since `start.ts`'s own `adminServers` object
+  never copied that field over at all.
+- `Zanix.start()`/`bootstrap()` now traps `SIGINT`/`SIGTERM` automatically (no opt-out) — either
+  signal runs `Zanix.stop()` before exiting, draining in-flight HTTP requests via `Deno.serve()`'s
+  own `.shutdown()` instead of the process dying mid-request the moment an orchestrator (Docker,
+  Kubernetes, ...) sends its default stop signal. Mirrors `startWorker()`'s own existing
+  `SIGINT`/`SIGTERM` precedent. `Zanix.stop()` itself now also closes connector connections
+  (`closeAllConnections()`) after the HTTP servers finish draining — previously only `stopWorker()`
+  did this, leaving `Zanix.stop()`-triggered shutdowns with open DB/cache connections.
+- `ConfigOptions.dlq` on `Zanix.setup()`: `modelName`/`encryptPayload`/`defaultLeaseMs`, setting
+  `DLQ_MODEL_NAME`/`DLQ_ENCRYPT_PAYLOAD`/`DLQ_DEFAULT_LEASE_MS` for `@zanix/datamaster`'s
+  `DLQProvider` — same env-var-bridge shape and "already-set env var always wins" precedence as the
+  existing `database`/`notifications` options. See
+  [README: General configuration](README.md#general-configuration-zanixsetup).
+
+### Removed
+
+- **BREAKING**: `AppBootstrapOptions` (`SetupOptions.apps`'s legacy `{ rootDir, server }` shape) is
+  removed entirely — every `apps.<name>` entry is now a `defineZanixApp()` manifest
+  (`ZanixAppBootstrapOptions`, `{ definition, server?, uses? }`). `AppsOptions` narrows from
+  `Record<string, AppBootstrapOptions | ZanixAppBootstrapOptions>` to
+  `Record<string,
+  ZanixAppBootstrapOptions>`. No consumer of this legacy shape was found within
+  this workspace; removed with the risk accepted that an external consumer may still exist.
+  `AppBootstrapOptions` is no longer exported from `@zanix/core`. Named apps are resolved as one
+  batch via `@zanix/app/runtime`'s `activateApps` (so apps sharing a root resource — see the new
+  `SetupOptions.resources` — resolve to the same instance) instead of each getting its own
+  `defineLocalMetadata`/`bootstrapServers` call in isolation.
+
+### Fixed
+
+- **`start()`, `startWorker()`, and `modules/tasker.ts`** now all run `defineCoreMetadata()` to
+  completion before `defineLocalMetadata()` starts, instead of racing/reversing the two. Previously:
+  `startWorker()`/`tasker.ts` awaited `defineLocalMetadata()` before `defineCoreMetadata()` —
+  reversed order, deterministically wrong; `start()` ran both concurrently via `Promise.all`, which
+  only worked in practice because `defineCoreMetadata()`'s plain package imports usually resolve
+  before `defineLocalMetadata()`'s filesystem scan, never a guaranteed ordering. Either way, a local
+  file rewriting a reserved core connector/provider slot (e.g. a consumer's own Elasticsearch
+  connector decorated `@Connector({ slot: 'search' })`) could be evaluated before the owning
+  package's `/core` entrypoint had registered that slot in that process's own module graph — most
+  visibly in a Worker/tasker process, throwing
+  `Cannot decorate '<Class>' with slot "<slot>": this is a reserved core connector slot, but it
+  hasn't been registered yet in this module context`.
+  The new order also matches what `startWorker()`'s own doc comment already described.
+  Regression-covered by two real subprocess runs (own module graph, like a real Worker) in
+  `@tests/integration/reserved-slot-order.test.ts`.
+- **`start()`'s new local admin sub-app bootstrap (see Added, above) no longer reuses the embedded
+  admin server's own `id`/`globalPrefix`/`onCreate`.** Found while wiring it: `@zanix/server`'s
+  `WebServerManager` keys its per-port dispatch table by `dispatchKey` (the anchored `serverID` when
+  anchored, the raw `globalPrefix` otherwise) — never derived from the Application name. Two
+  Applications sharing the exact same `id`/`globalPrefix` don't merge their routes under that key;
+  the LATER `create()` call's handler (bound to ONE Application) silently replaces the earlier
+  one's. Reusing `adminServers` verbatim for the new sub-apps made `ADMIN_APPLICATION`'s own
+  `/admin/triggers`/`/admin/templates`/`/admin/service-token` controllers 404 whenever a sub-app
+  registered after them on the same port — caught via real HTTP fetches in
+  `admin-hub-coexistence*.test.ts`/`start-admin-and-server-combined.test.ts`/
+  `start-code-templates-discovery-with-admin.test.ts`, not by any unit-level test. Each sub-app now
+  resolves its own independent `id` and falls back to its own name as `globalPrefix` when
+  unanchored.
+- **`admin.ssr` no longer type-checks as a no-op.** `AdminBootstrapServerOptions` is built
+  generically from `@zanix/server`'s `WebServerTypes` (`rest`/`graphql`/`socket`/`ssr`), so
+  `admin: { ssr: {...} }` always compiled — but `start.ts`'s own `ADMIN_TYPES` was a hand-copied
+  `['rest', 'graphql', 'socket']`, one type short, so an `ssr` entry was silently dropped at runtime
+  with no error. `ADMIN_TYPES` now lists all four, with a compile-time check
+  (`assertAdminTypesExhaustive`) that fails to build instead of silently drifting again the next
+  time `@zanix/server` adds a type. `@zanix/admin` doesn't compose any `ssr` routes of its own
+  today, so this is a no-op unless your own app also composes an `ssr` handler under the shared
+  `'admin'` Application.
+- **`Zanix.stop()` called twice in a row no longer re-runs a Zanix App's `onStop` hooks and
+  re-`close()`s its resources a second time.** `start.ts`'s own `activatedApps` (set once `apps`/
+  `admin` activates at least one Zanix App) was read by `stop()` but never cleared afterward —
+  unlike `signalShutdown`, which already followed this pattern. Neither `deactivateApps` nor
+  `ResourceRegistry.close()` (both in `@zanix/app`) guards against being called twice on their own,
+  so a direct `stop()` call followed by a signal-triggered one (or two signals in quick succession)
+  silently fired every app's own `onStop` twice and attempted to close already-closed resources
+  again. `activatedApps` is now cleared before `deactivateApps` runs, matching the idempotency
+  `stop()`'s own doc already promised. Regression-covered in `start-shutdown-signal.test.ts` (an
+  `onStop` spy asserted to fire exactly once across two `stop()` calls).
+
 ## [1.0.0] - 2026-08-03
 
 ### Added

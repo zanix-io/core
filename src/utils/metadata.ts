@@ -2,7 +2,6 @@ import { collectFiles, getRootDir } from '@zanix/helpers/files'
 import { ZANIX_SERVER_MODULES } from '@zanix/server'
 import { setTaskerUrl } from '@zanix/asyncmq/worker'
 import { join } from '@std/path'
-import { defineAdminMetadata as defineAdminControllers } from '@zanix/admin'
 import { registerPendingTriggerActionJobs } from '../modules/jobs/triggers.ts'
 
 /**
@@ -51,19 +50,4 @@ export const defineCoreMetadata = async () => {
   // import above has resolved, since those are what populate the registry this drains. See
   // `registerPendingTriggerActionJobs`'s own doc for why the ordering matters.
   registerPendingTriggerActionJobs()
-}
-
-/**
- * Loads admin-only route/handler registrations for the admin servers `start.ts` bootstraps.
- *
- * @remarks
- * This package no longer defines any admin-domain code of its own — the full composition logic
- * (which controllers get built, which Application each composes under by default, and the
- * `ADMIN_TRIGGERS_APPLICATION`/`ADMIN_TEMPLATES_APPLICATION` rebinding env vars) now lives in
- * `@zanix/admin`'s own `defineAdminMetadata()`, which this thin wrapper delegates to — see that
- * package's own JSDoc and README ("Admin APIs" section) for the full behavior, and
- * `docs/admin-apis.md` for this env vars' externally-facing documentation.
- */
-export const defineAdminMetadata = async (): Promise<void> => {
-  await defineAdminControllers()
 }

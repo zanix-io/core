@@ -61,15 +61,23 @@ await Zanix.start({ admin: { rest: { port: 4000 } } }) // enabled, explicit REST
 ```
 
 Passing an object uses the exact same shape as the top-level `server` option — anything
-`bootstrapServers` accepts per type (`rest`/`graphql`/`socket`) works here too, **except
+`bootstrapServers` accepts per type (`rest`/`graphql`/`socket`/`ssr`) works here too, **except
 `application`**: an admin sub-server is always bound to the `'admin'` Application (see
 `@zanix/server`'s `docs/HANDLERS.md#applications`), so passing it is a type error rather than a
-silently overridden value. An explicit `id`/`previousId` here always wins over the
-`ADMIN_SERVER_ID`/`ADMIN_SERVER_ID_PREVIOUS` env vars — same "explicit option beats env var"
-precedence every other Zanix option follows; omit them to fall back to the env-derived value
-instead, same as before. Useful to run more than one admin-enabled instance of this service
-distinguishably, without relying on a single process-wide env var to tell them apart. See
-["Pinning a stable address"](#pinning-a-stable-address-admin_server_id) below.
+silently overridden value. `@zanix/admin` doesn't compose any `ssr` routes of its own, so
+`admin.ssr` is only useful if your own app composes an `ssr` handler under the shared `'admin'`
+Application too — see ["Scope"](#scope-admin-vs-a-services-own-application-routes) below. An
+explicit `id`/`previousId` here always wins over the `ADMIN_SERVER_ID`/`ADMIN_SERVER_ID_PREVIOUS`
+env vars — same "explicit option beats env var" precedence every other Zanix option follows; omit
+them to fall back to the env-derived value instead, same as before. Useful to run more than one
+admin-enabled instance of this service distinguishably, without relying on a single process-wide env
+var to tell them apart. See ["Pinning a stable address"](#pinning-a-stable-address-admin_server_id)
+below.
+
+`admin.health` is a sibling of the per-type fields (not nested under one of them, same as `health`
+on the top-level `server` option) — an explicit value here always wins; omitted, it inherits
+whatever `server.health` resolves to, since the embedded admin server shares the main server's port
+by default. Set it explicitly only to make admin's own health checks independent of the main app's.
 
 ### Ports and single-port platforms (Heroku, Render, Railway, …)
 
@@ -157,8 +165,9 @@ into that same `'admin'` Application (via `ProgramModule.defineApplication('admi
 own purposes; those share the same bucket described below. If you want a separate, non-default
 Application server for your _own_ routes without `@zanix/admin`'s, register them under a different
 Application name and call `bootstrapServers({ ..., application: 'your-name' })` directly rather than
-going through `admin` — or register it as another named entry of `apps` itself (see
-`AppBootstrapOptions`), which does the same `defineApplication`/`bootstrapServers` wiring for you.
+going through `admin` — or register it as another named `apps` entry itself (a `defineZanixApp()`
+manifest, see `ZanixAppBootstrapOptions`), which does the same `activateApps`/`bootstrapServers`
+wiring for you.
 
 **Caveat: `'admin'` is not exclusively reserved for this package.** `@zanix/server` keeps exactly
 one route bucket per Application name per server type (`rest`/`graphql`/`socket`) — every capability
@@ -188,7 +197,9 @@ import { ADMIN_ROLE, ADMIN_TEMPLATES_ROLE, ADMIN_TRIGGERS_ROLE } from 'jsr:@zani
 
 // ADMIN_ROLE grants both APIs. Use ADMIN_TRIGGERS_ROLE / ADMIN_TEMPLATES_ROLE instead to grant
 // just one of the two — permissions are OR'd, so either role is enough on its own.
-await authProvider.session.generateTokens(adminUser, { permissions: [ADMIN_ROLE] })
+await authProvider.session.generateTokens(adminUser, {
+  permissions: [ADMIN_ROLE],
+})
 ```
 
 Without one of these roles, requests to either of the two gated APIs are rejected before reaching

@@ -34,7 +34,9 @@ Deno.test({
     )
 
     assert(servers.length === 3)
-    for (const server of servers) assert(webServerManager.info(server as never).addr)
+    for (const server of servers) {
+      assert(webServerManager.info(server as never).addr)
+    }
 
     Zanix.stop()
   },

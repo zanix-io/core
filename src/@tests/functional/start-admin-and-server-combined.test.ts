@@ -27,9 +27,15 @@ Deno.test({
     let adminServerId: string | undefined
 
     await Zanix.bootstrap({
-      admin: { rest: { port: ADMIN_PORT, onCreate: (id) => (adminServerId = id) } },
+      admin: {
+        rest: { port: ADMIN_PORT, onCreate: (id) => (adminServerId = id) },
+      },
       server: {
-        rest: { port: MAIN_PORT, globalPrefix: 'auth', onCreate: (id) => (mainServerId = id) },
+        rest: {
+          port: MAIN_PORT,
+          globalPrefix: 'auth',
+          onCreate: (id) => (mainServerId = id),
+        },
       },
     })
     await new Promise((resolve) => setTimeout(resolve, 1000)) // wait for mongo/redis core connect
@@ -41,7 +47,9 @@ Deno.test({
 
     // The main app's own route, reachable under the explicit `globalPrefix` instead of the
     // generic `/api` default.
-    const welcome = await fetch(`http://${mainAddr.hostname}:${mainAddr.port}/auth/welcome`)
+    const welcome = await fetch(
+      `http://${mainAddr.hostname}:${mainAddr.port}/auth/welcome`,
+    )
     assertEquals(welcome.status, 200)
     await welcome.body?.cancel()
 

@@ -23,7 +23,10 @@ Deno.test({
     })
     await new Promise((resolve) => setTimeout(resolve, 1000)) // wait for mongo/redis core connect
 
-    assert(adminServerId, 'admin.rest.onCreate should have been called with the created id')
+    assert(
+      adminServerId,
+      'admin.rest.onCreate should have been called with the created id',
+    )
     assertEquals(adminServerId, 'admin-oncreate-test-rest')
 
     Deno.env.delete('ADMIN_SERVER_ID')

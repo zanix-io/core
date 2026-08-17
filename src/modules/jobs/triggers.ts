@@ -8,7 +8,10 @@ import {
 } from '@zanix/database'
 import { registerJob } from '@zanix/asyncmq/jobs'
 
-type RequestJobArgs = Pick<TriggerActions['request'], 'url' | 'method' | 'headers' | 'body'>
+type RequestJobArgs = Pick<
+  TriggerActions['request'],
+  'url' | 'method' | 'headers' | 'body'
+>
 
 /**
  * Handler for the built-in `request` trigger action ({@link DEFAULT_TRIGGER_JOBS.request}).
