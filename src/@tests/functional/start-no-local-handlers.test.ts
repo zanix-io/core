@@ -44,6 +44,6 @@ Deno.test({
       'expected the "The main server was not started" warning to have been logged',
     )
 
-    Zanix.stop()
+    await Zanix.stop()
   },
 })

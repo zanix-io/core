@@ -38,7 +38,7 @@ Deno.test({
       assert(webServerManager.info(server as never).addr)
     }
 
-    Zanix.stop()
+    await Zanix.stop()
   },
 })
 

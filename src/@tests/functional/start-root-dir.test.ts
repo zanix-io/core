@@ -37,7 +37,7 @@ Deno.test({
         'away from the project handlers that normally register',
     )
 
-    Zanix.stop()
+    await Zanix.stop()
     warnStub.restore()
   },
 })

@@ -108,7 +108,7 @@ Deno.test({
       await triggers.body?.cancel()
     } finally {
       await ZanixAdminHub.stop()
-      Zanix.stop()
+      await Zanix.stop()
     }
   },
 })
@@ -133,6 +133,6 @@ Deno.test({
     )
 
     await ZanixAdminHub.stop()
-    Zanix.stop()
+    await Zanix.stop()
   },
 })

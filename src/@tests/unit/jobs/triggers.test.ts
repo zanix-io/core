@@ -1,30 +1,16 @@
 import { assertEquals } from '@std/assert'
-import { DEFAULT_TRIGGER_JOBS, getRegisteredTriggerActionJobs } from '@zanix/database'
-import { registerPendingTriggerActionJobs, requestJobHandler } from 'modules/jobs/triggers.ts'
+import { requestJobHandler } from 'modules/jobs/triggers.ts'
 
 // `mailJobHandler`'s own behavior (mapping a `mail` trigger action onto `NotifierProvider`) now
 // lives in `@zanix/notifications` (`sendMailTriggerNotification`, `MailTriggerActionData`) — see
 // that package's own unit tests. This file only covers what `@zanix/core` itself still owns:
-// `request` (the ownerless generic `fetch` handler) and the descriptor drain loop.
-
-Deno.test('registerPendingTriggerActionJobs registers "request" as a descriptor', () => {
-  registerPendingTriggerActionJobs()
-
-  const request = getRegisteredTriggerActionJobs().find((d) => d.actionKind === 'request')
-  assertEquals(request?.name, DEFAULT_TRIGGER_JOBS.request)
-  assertEquals(request?.processingQueue, 'soft')
-})
-
-Deno.test({
-  name: 'registerPendingTriggerActionJobs is a no-op on a second call in the same process',
-  fn: () => {
-    // Guards against re-registering (and throwing) on a second `defineCoreMetadata()` cycle, e.g.
-    // many independent `Zanix.bootstrap()` calls in one `deno test` run — see this function's own
-    // doc for why neither registry involved is ever wiped between boots.
-    registerPendingTriggerActionJobs()
-    registerPendingTriggerActionJobs()
-  },
-})
+// `request` (the ownerless generic `fetch` handler).
+//
+// `registerPendingTriggerActionJobs()`'s own registration behavior (asserted against the real,
+// cross-package `getRegisteredTriggerActionJobs()` registry) now lives in
+// `src/@tests/integration/jobs/triggers.test.ts` — same tier as this repo's own
+// `defineCoreMetadata` registration checks and `@zanix/notifications`'s
+// `integration/di-registration.test.ts`.
 
 Deno.test('requestJobHandler performs a fetch with the given url/method/headers/body', async () => {
   const calls: unknown[] = []

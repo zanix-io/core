@@ -36,6 +36,6 @@ Deno.test({
     assertEquals(res.status, 404)
     await res.body?.cancel()
 
-    Zanix.stop()
+    await Zanix.stop()
   },
 })

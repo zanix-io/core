@@ -61,6 +61,6 @@ Deno.test({
 
     Deno.env.delete('ADMIN_TRIGGERS_APPLICATION')
     Deno.env.delete('ADMIN_SERVER_ID')
-    Zanix.stop()
+    await Zanix.stop()
   },
 })

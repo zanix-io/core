@@ -25,12 +25,12 @@ Deno.test({
       'is still running',
     )
 
-    Zanix.stop()
+    await Zanix.stop()
 
     // The guard was released by `stop()` — a fresh `start()` must succeed again, not stay
     // permanently blocked by the earlier rejection.
     await Zanix.bootstrap()
 
-    Zanix.stop()
+    await Zanix.stop()
   },
 })

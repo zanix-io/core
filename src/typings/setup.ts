@@ -141,7 +141,7 @@ export type CodeTemplatesDiscoveryOptions = {
  *     `ADMIN_SERVER_ID_PREVIOUS`) — see `AdminBootstrapServerOptions`'s own doc for the precedence.
  * @property {AppsOptions} [apps] - Named secondary Zanix Apps (`defineZanixApp()` manifests)
  * bootstrapped alongside the main one, each on its own Application (see `@zanix/server`'s
- * `docs/HANDLERS.md#applications`) so their routes/resolvers never leak onto the main app's or
+ * `docs/handlers.md#applications`) so their routes/resolvers never leak onto the main app's or
  * each other's. Resolved as one batch (`@zanix/app/runtime`'s `activateApps`, so apps sharing a
  * root resource — see `resources` below — resolve to the same instance), then served
  * individually per entry that declares its own `server`. See `ZanixAppBootstrapOptions`.
@@ -170,4 +170,22 @@ export type SetupOptions = {
   apps?: AppsOptions
   resources?: RootResources
   codeTemplatesDiscovery?: boolean | CodeTemplatesDiscoveryOptions
+}
+
+/**
+ * Options accepted by `Zanix.compose()`'s second parameter — see that function's own doc for the
+ * full "why admin, never apps" rationale.
+ *
+ * @property {boolean} [admin] - Also registers `@zanix/admin`'s built-in local admin app
+ * (`defineLocalAdminApp()`) and its enabled sub-apps (`getLocalAdminSubApps()`) — the exact same
+ * manifests `start()`'s own `admin` option composes — so their routes become visible via
+ * `ProgramModule.routes.getRoutes('rest')` too. **Disabled by default**, matching `SetupOptions
+ * .admin`'s own default. Verified safe to include here (unlike `SetupOptions.apps`, still excluded
+ * — see `compose()`'s own doc): none of these manifests declare `dependencies`/`resources`/
+ * `onStart`/`onStop`/`jobs`, so `activateApps()`'s own resource-resolution/lifecycle steps are
+ * genuine no-ops for this specific, fixed set — this option can never construct a real connector,
+ * start a timer, or leave anything needing an explicit `deactivateApps()`/teardown call.
+ */
+export type ComposeOptions = {
+  admin?: boolean
 }

@@ -1,7 +1,7 @@
 # Admin APIs
 
 `Zanix.start({ admin: true })` bootstraps a separate, **`'admin'`-Application** server (never
-reachable through the public `server` options) that exposes three built-in APIs. It's **anchored**
+reachable through the public `server` options) that exposes four built-in APIs. It's **anchored**
 (its own id doubles as an obscuring URL prefix) whenever `ADMIN_SERVER_ID` is set — see
 ["Pinning a stable address"](#pinning-a-stable-address-admin_server_id) below — and a plain,
 unprefixed server otherwise; there is no auto-generated anchored id.
@@ -25,30 +25,45 @@ sequential `await` between them.
   ["Rebinding a capability to a different Application"](#rebinding-a-capability-to-a-different-application-admin_triggers_application-admin_templates_application)
   below).
 - **`/admin/templates`** — manage `@zanix/notifications`'s Handlebars templates. Only registered
-  once the app has opted into DB-backed templates (`DATABASE_TEMPLATES=true` or
-  `TEMPLATES_MODEL_NAME` set) — see `@zanix/notifications`'s `docs/templates.md` for the per-service
-  vs. shared-storage decision this depends on. Its underlying service/repository
-  (`TemplatesAdminService`/`TemplatesAdminRepository`) is owned by `@zanix/notifications` the same
-  way triggers' is owned by `@zanix/datamaster` — `@zanix/admin` only composes it, and re-exports
-  the same classes here unchanged. Composed under the `'admin'` Application by default —
-  `ADMIN_TEMPLATES_APPLICATION` overrides it the same way as triggers, above.
+  once the app has selected `TEMPLATES_BACKEND=local` (a bare `TEMPLATES_MODEL_NAME` alone has no
+  effect anymore — see `@zanix/notifications`'s `templatesBackendMode()`) — see
+  `@zanix/notifications`'s `docs/templates.md` for the per-service vs. shared-storage decision this
+  depends on. Its underlying service/repository (`TemplatesAdminService`/`TemplatesAdminRepository`)
+  is owned by `@zanix/notifications` the same way triggers' is owned by `@zanix/datamaster` —
+  `@zanix/admin` only composes it, and re-exports the same classes here unchanged. Composed under
+  the `'admin'` Application by default — `ADMIN_TEMPLATES_APPLICATION` overrides it the same way as
+  triggers, above.
+- **`/admin/dlq`** — manage `@zanix/datamaster`'s persisted Dead Letter Queue entries at runtime
+  (`push`/`get`/`list`/`requeue`/`discard`/`remove`). Opt-in, the same shape as `/admin/templates` —
+  only registered once `DLQ_MODEL_NAME` is set (see `Zanix.setup({ dlq: { modelName } })` in
+  [the README](../README.md#general-configuration-zanixsetup), or set the env var directly); a bare
+  `admin: true` with no `DLQ_MODEL_NAME` set never registers this route, the same "opt-in, not
+  on-by-default" shape templates already has, for the same reason (`@zanix/datamaster`'s own
+  `registerDLQModel()` is a standalone call your own bootstrap must make explicitly — nothing
+  registers it as a side effect of importing the DLQ classes). Its underlying service
+  (`DLQAdminService`, from `@zanix/datamaster`) is owned by `@zanix/datamaster` the same way
+  triggers' is — `@zanix/admin` only composes the HTTP surface (`createDlqAdminController`, from
+  `@zanix/datamaster/dlq-api`, re-exported here unchanged). Composed under the `'admin'` Application
+  by default; `ADMIN_DLQ_APPLICATION` (an env var, not a re-exported constant) overrides it the same
+  way as triggers/templates, above.
 - **`/admin/service-token`** — machine-to-machine credential exchange, per `@zanix/auth`'s
   `docs/service-credential.md`. Always registered, unauthenticated (there's no session to gate yet —
   the caller is here to obtain one). A thin wrapper around `@zanix/auth`'s
   `exchangeServiceCredential`: POST `{ assertion }` (a JWT signed with the calling service's own key
   via `createServiceAssertion`), get back a real `type: 'api'` access token to use against this
   service's other admin/business APIs. Also built by `@zanix/admin`
-  (`createServiceExchangeController`). See below for the two triggers/templates APIs; this one has
-  no client wrapper of its own since it's a single POST — call it directly.
+  (`createServiceExchangeController`). See below for the three triggers/templates/dlq APIs; this one
+  has no client wrapper of its own since it's a single POST — call it directly.
 
-Alongside `/admin/templates` and `/admin/triggers`, read-only **`/.well-known/zanix/templates`** and
-**`/.well-known/zanix/triggers`** endpoints are also registered on the same admin server —
-`@zanix/server`'s Discovery mechanism (see its own `docs/HANDLERS.md#discovery`), for a central sync
+Alongside `/admin/templates`, `/admin/triggers`, and `/admin/dlq`, read-only
+**`/.well-known/zanix/templates`**, **`/.well-known/zanix/triggers`**, and
+**`/.well-known/zanix/dlq`** endpoints are also registered on the same admin server —
+`@zanix/server`'s Discovery mechanism (see its own `docs/handlers.md#discovery`), for a central sync
 job or aggregator to snapshot this service's current resources without going through the
 authenticated CRUD surface. Each is gated by the same role pair as its CRUD counterpart
-(`ADMIN_ROLE`/`ADMIN_TEMPLATES_ROLE`, `ADMIN_ROLE`/`ADMIN_TRIGGERS_ROLE`), and each provider is
-authored by the same data owner as its CRUD layer above (`@zanix/notifications`,
-`@zanix/datamaster`) — `@zanix/admin` only registers them.
+(`ADMIN_ROLE`/`ADMIN_TEMPLATES_ROLE`, `ADMIN_ROLE`/`ADMIN_TRIGGERS_ROLE`, `ADMIN_ROLE`/
+`ADMIN_DLQ_ROLE`), and each provider is authored by the same data owner as its CRUD layer above
+(`@zanix/notifications`, `@zanix/datamaster`) — `@zanix/admin` only registers them.
 
 ## The `admin` option
 
@@ -63,7 +78,7 @@ await Zanix.start({ admin: { rest: { port: 4000 } } }) // enabled, explicit REST
 Passing an object uses the exact same shape as the top-level `server` option — anything
 `bootstrapServers` accepts per type (`rest`/`graphql`/`socket`/`ssr`) works here too, **except
 `application`**: an admin sub-server is always bound to the `'admin'` Application (see
-`@zanix/server`'s `docs/HANDLERS.md#applications`), so passing it is a type error rather than a
+`@zanix/server`'s `docs/handlers.md#applications`), so passing it is a type error rather than a
 silently overridden value. `@zanix/admin` doesn't compose any `ssr` routes of its own, so
 `admin.ssr` is only useful if your own app composes an `ssr` handler under the shared `'admin'`
 Application too — see ["Scope"](#scope-admin-vs-a-services-own-application-routes) below. An
@@ -125,59 +140,62 @@ way it would for any other unanchored server — see
 for the distinct default prefix this bootstrap gives it in that case, to stay safe sharing a port
 with the main server.
 
-### Rebinding a capability to a different Application (`ADMIN_TRIGGERS_APPLICATION`, `ADMIN_TEMPLATES_APPLICATION`)
+### Rebinding a capability to a different Application (`ADMIN_TRIGGERS_APPLICATION`, `ADMIN_TEMPLATES_APPLICATION`, `ADMIN_DLQ_APPLICATION`)
 
-Both `/admin/triggers` and `/admin/templates` are, by default, composed under the `'admin'`
-Application — the same server the rest of this page describes. Two env vars let you rebind either
-one, independently, onto a **different** Application's Runtime instead:
+`/admin/triggers`, `/admin/templates`, and `/admin/dlq` are, by default, all composed under the
+`'admin'` Application — the same server the rest of this page describes. Three env vars let you
+rebind any one, independently, onto a **different** Application's Runtime instead:
 
 ```env
 ADMIN_TRIGGERS_APPLICATION=main
 ADMIN_TEMPLATES_APPLICATION=main
+ADMIN_DLQ_APPLICATION=main
 ```
 
-Setting either to `'main'` moves that one capability onto the default Application's own server — the
-same `bootstrapServers(options.server)` call your own app's routes are served from — reachable at
-its normal `globalPrefix` (`/api/...` by default) instead of under the admin server's own prefix.
-Leaving both unset (the default) keeps both capabilities on the `'admin'` Application, exactly as
-described above.
+Setting any of them to `'main'` moves that one capability onto the default Application's own server
+— the same `bootstrapServers(options.server)` call your own app's routes are served from — reachable
+at its normal `globalPrefix` (`/api/...` by default) instead of under the admin server's own prefix.
+Leaving all three unset (the default) keeps every capability on the `'admin'` Application, exactly
+as described above.
 
 This is a **Runtime-binding override, not an authentication/authorization one** — rebinding
 `/admin/triggers` onto `'main'` only changes _where_ it's served from; `AuthTokenValidation` and the
-`ADMIN_ROLE`/`ADMIN_TRIGGERS_ROLE`/`ADMIN_TEMPLATES_ROLE` gate described further down remain the
-actual access-control boundary either way. Use this only if your deployment platform genuinely can't
-isolate the admin server on its own address — pinning `ADMIN_SERVER_ID` on the `'admin'` Application
-(the default) is the safer, recommended choice otherwise: an unguessable, operator-chosen URL prefix
-as defense-in-depth underneath the real auth gate.
+`ADMIN_ROLE`/`ADMIN_TRIGGERS_ROLE`/`ADMIN_TEMPLATES_ROLE`/`ADMIN_DLQ_ROLE` gate described further
+down remain the actual access-control boundary either way. Use this only if your deployment platform
+genuinely can't isolate the admin server on its own address — pinning `ADMIN_SERVER_ID` on the
+`'admin'` Application (the default) is the safer, recommended choice otherwise: an unguessable,
+operator-chosen URL prefix as defense-in-depth underneath the real auth gate.
 
 Each env var accepts any Application name, not just `'main'` — e.g.
 `ADMIN_TRIGGERS_APPLICATION=billing` composes it under a `'billing'` Application instead, which
 would then need its own `bootstrapServers({..., application: 'billing'})` call somewhere in your own
 app to actually serve it (`admin: true`'s own bootstrap only ever activates the `'admin'`
-Application's Runtime).
+Application's Runtime). None of the three `*_APPLICATION` env var names are re-exported as constants
+from `@zanix/core`/`@zanix/admin` — set them by their literal string name, same as `ADMIN_SERVER_ID`
+itself.
 
 ### Scope: `admin` vs. a service's own Application routes
 
-`admin` only toggles `@zanix/admin`'s own triggers/templates/service-token routes, all registered
-under `@zanix/server`'s `'admin'` Application (see its `docs/HANDLERS.md#applications`). Application
-itself is a generic `@zanix/server` mechanism — nothing stops your _own_ code from composing routes
-into that same `'admin'` Application (via `ProgramModule.defineApplication('admin', ...)`) for your
-own purposes; those share the same bucket described below. If you want a separate, non-default
-Application server for your _own_ routes without `@zanix/admin`'s, register them under a different
-Application name and call `bootstrapServers({ ..., application: 'your-name' })` directly rather than
-going through `admin` — or register it as another named `apps` entry itself (a `defineZanixApp()`
-manifest, see `ZanixAppBootstrapOptions`), which does the same `activateApps`/`bootstrapServers`
-wiring for you.
+`admin` only toggles `@zanix/admin`'s own triggers/templates/dlq/service-token routes, all
+registered under `@zanix/server`'s `'admin'` Application (see its `docs/handlers.md#applications`).
+Application itself is a generic `@zanix/server` mechanism — nothing stops your _own_ code from
+composing routes into that same `'admin'` Application (via
+`ProgramModule.defineApplication('admin', ...)`) for your own purposes; those share the same bucket
+described below. If you want a separate, non-default Application server for your _own_ routes
+without `@zanix/admin`'s, register them under a different Application name and call
+`bootstrapServers({ ..., application: 'your-name' })` directly rather than going through `admin` —
+or register it as another named `apps` entry itself (a `defineZanixApp()` manifest, see
+`ZanixAppBootstrapOptions`), which does the same `activateApps`/`bootstrapServers` wiring for you.
 
 **Caveat: `'admin'` is not exclusively reserved for this package.** `@zanix/server` keeps exactly
 one route bucket per Application name per server type (`rest`/`graphql`/`socket`) — every capability
 composed under `'admin'`, regardless of which package composed it, shares that same bucket.
-`@zanix/admin`'s own triggers/templates/service-token routes and any of your own service's routes
-you deliberately compose under `'admin'` share it too. If your own app also composes routes under
-`'admin'` in the same process as `admin: true`, both sets of routes get mounted together by
+`@zanix/admin`'s own triggers/templates/dlq/service-token routes and any of your own service's
+routes you deliberately compose under `'admin'` share it too. If your own app also composes routes
+under `'admin'` in the same process as `admin: true`, both sets of routes get mounted together by
 whichever `bootstrapServers({..., application: 'admin'})` call serves that Application — and
 potentially served twice, once under each call's own id/prefix, if you also bootstrap it a second
-time yourself. See `@zanix/server`'s `docs/HANDLERS.md` "Applications" section for the underlying
+time yourself. See `@zanix/server`'s `docs/handlers.md` "Applications" section for the underlying
 mechanism.
 
 See [`./admin-architecture.md`](./admin-architecture.md) for how this service's own admin API
@@ -187,23 +205,29 @@ both in one process, and standing up `ZanixAdminHub` alongside this service.
 
 ### Roles and authentication
 
-The triggers and templates APIs require a role, via `@zanix/auth`'s `@AuthTokenValidation` (the
-service-token exchange endpoint above is deliberately the exception — see why in its own bullet).
-Assign a role to whichever account (an ops/admin user, or a service/API token) should be allowed to
-manage them:
+The triggers, templates, and DLQ APIs each require a role, via `@zanix/auth`'s
+`@AuthTokenValidation` (the service-token exchange endpoint above is deliberately the exception —
+see why in its own bullet). Assign a role to whichever account (an ops/admin user, or a service/API
+token) should be allowed to manage them:
 
 ```typescript
-import { ADMIN_ROLE, ADMIN_TEMPLATES_ROLE, ADMIN_TRIGGERS_ROLE } from 'jsr:@zanix/core@[version]'
+import {
+  ADMIN_DLQ_ROLE,
+  ADMIN_ROLE,
+  ADMIN_TEMPLATES_ROLE,
+  ADMIN_TRIGGERS_ROLE,
+} from 'jsr:@zanix/core@[version]'
 
-// ADMIN_ROLE grants both APIs. Use ADMIN_TRIGGERS_ROLE / ADMIN_TEMPLATES_ROLE instead to grant
-// just one of the two — permissions are OR'd, so either role is enough on its own.
+// ADMIN_ROLE grants all three APIs. Use ADMIN_TRIGGERS_ROLE / ADMIN_TEMPLATES_ROLE / ADMIN_DLQ_ROLE
+// instead to grant just one of the three — permissions are OR'd, so any one role is enough on its
+// own.
 await authProvider.session.generateTokens(adminUser, {
   permissions: [ADMIN_ROLE],
 })
 ```
 
-Without one of these roles, requests to either of the two gated APIs are rejected before reaching
-any handler. Both accept either a human admin's `type: 'user'` token
+Without one of these roles, requests to any of the three gated APIs are rejected before reaching any
+handler. All three accept either a human admin's `type: 'user'` token
 (`Authorization: Bearer <token>`) or a machine caller's `type: 'api'` one
 (`X-Znx-Authorization: Bearer <token>`) on the same route — e.g. `@zanix/notifications`'s
 `RemoteTemplateBackend`, or `@zanix/admin`, can authenticate without a human ever being in the loop;
@@ -212,21 +236,21 @@ that `type: 'api'` token is exactly what `/admin/service-token` mints. See `@zan
 
 ### Protocol version header
 
-Every response from all three APIs carries an `X-Znx-Admin-Protocol` header
-(`ADMIN_PROTOCOL_HEADER`, currently `ADMIN_PROTOCOL_VERSION` = `1`) — a version identifier for the
-admin protocol's own request/response shapes, independent of this package's semver. `@zanix/admin`
-actually administers this protocol: it validates a caller's own declared version (same header, sent
-on the _request_) against what it still understands, rejecting an unrecognized one with a
-`400 Bad Request` rather than silently guessing — see `@zanix/admin`'s own "Protocol negotiation"
-docs. No caller sends this header today, so nothing changes for an existing consumer: an absent
-declared version always defaults to the current one. Both constants, along with the roles above and
-the `TemplatesAdminClient`/`TriggersAdminClient` (see
+Every response from all four APIs carries an `X-Znx-Admin-Protocol` header (`ADMIN_PROTOCOL_HEADER`,
+currently `ADMIN_PROTOCOL_VERSION` = `1`) — a version identifier for the admin protocol's own
+request/response shapes, independent of this package's semver. `@zanix/admin` actually administers
+this protocol: it validates a caller's own declared version (same header, sent on the _request_)
+against what it still understands, rejecting an unrecognized one with a `400 Bad Request` rather
+than silently guessing — see `@zanix/admin`'s own "Protocol negotiation" docs. No caller sends this
+header today, so nothing changes for an existing consumer: an absent declared version always
+defaults to the current one. Both constants, along with the roles above and the
+`TemplatesAdminClient`/`TriggersAdminClient`/`DlqAdminClient` (see
 [`./admin-architecture.md`](./admin-architecture.md)), are owned by `@zanix/admin` — this package
 depends on it and re-exports them from its own `mod.ts` unchanged, so existing imports from
 `@zanix/core` keep working exactly as shown above. `ADMIN_PROTOCOL_HEADER` itself is, one level
 further down, re-exported from `@zanix/server` (only the header _name_, not the version), so
 `@zanix/notifications` can use it without depending on either `@zanix/core` or `@zanix/admin` — see
-`@zanix/server`'s `docs/CONFIGURATION.md#auth--admin-protocol-headers`.
+`@zanix/server`'s `docs/configuration.md#auth--admin-protocol-headers`.
 
 ### Pinning a stable address (`ADMIN_SERVER_ID`)
 
@@ -310,27 +334,37 @@ external service to pull from you.
 
 ## Building a custom admin API instead of the built-in one
 
-If the built-in `/admin/triggers`/`/admin/templates` routes don't fit (different auth, a different
-path, extra business logic around the CRUD), `@zanix/core` also re-exports the lower-level pieces
-`@zanix/admin` builds them from, so a custom controller can reuse the same CRUD logic instead of
-duplicating it:
+If the built-in `/admin/triggers`/`/admin/templates`/`/admin/dlq` routes don't fit (different auth,
+a different path, extra business logic around the CRUD), `@zanix/core` also re-exports the
+lower-level pieces the built-in routes are built from — authored by `@zanix/datamaster` (triggers,
+dlq) and `@zanix/notifications` (templates), the real owners of that data — so a custom controller
+can reuse the same CRUD logic instead of duplicating it:
 
-| Symbol                                                            | What it is                                                                                                                                                                    |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createTriggersAdminController`                                   | The factory that builds the built-in `/admin/triggers` controller itself — call it directly with your own `options` to mount an equivalent route under a different path/auth. |
-| `TriggersAdminService` / `TriggersAdminRepository`                | The triggers CRUD business/persistence logic, without the HTTP layer.                                                                                                         |
-| `TemplatesAdminService` / `TemplatesAdminRepository`              | The templates CRUD business/persistence logic, without the HTTP layer.                                                                                                        |
-| `CreateTriggerRTO` / `UpdateTriggerRTO` / `TriggerModelParamsRTO` | Request/response shapes for the triggers CRUD.                                                                                                                                |
-| `CreateTemplateRTO` / `UpdateTemplateRTO` / `TemplateParamsRTO`   | Request/response shapes for the templates CRUD.                                                                                                                               |
-| `ServiceExchangeRTO`                                              | Response shape for `/admin/service-token`.                                                                                                                                    |
-| `ADMIN_PROTOCOL_SUPPORTED_VERSIONS`                               | The full list of `X-Znx-Admin-Protocol` versions `@zanix/admin` still accepts, for a custom controller that wants to negotiate the same way.                                  |
+| Symbol                                                                                                        | What it is                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createTriggersAdminController`                                                                               | The factory that builds the built-in `/admin/triggers` controller itself — call it directly with your own `options` to mount an equivalent route under a different path/auth. |
+| `createDlqAdminController`                                                                                    | Same as above, one domain over — builds the built-in `/admin/dlq` controller.                                                                                                 |
+| `TriggersAdminService` / `TriggersAdminRepository`                                                            | The triggers CRUD business/persistence logic, without the HTTP layer.                                                                                                         |
+| `TemplatesAdminService` / `TemplatesAdminRepository`                                                          | The templates CRUD business/persistence logic, without the HTTP layer.                                                                                                        |
+| `CreateTriggerRTO` / `UpdateTriggerRTO` / `TriggerModelParamsRTO`                                             | Request/response shapes for the triggers CRUD.                                                                                                                                |
+| `CreateTemplateRTO` / `UpdateTemplateRTO` / `TemplateParamsRTO`                                               | Request/response shapes for the templates CRUD.                                                                                                                               |
+| `PushDLQEntryRTO` / `RequeueDLQEntryRTO` / `DiscardDLQEntryRTO` / `DLQEntryIdParamsRTO` / `ListDLQEntriesRTO` | Request/response shapes for the DLQ CRUD.                                                                                                                                     |
+| `ServiceExchangeRTO`                                                                                          | Response shape for `/admin/service-token`.                                                                                                                                    |
+| `ADMIN_PROTOCOL_SUPPORTED_VERSIONS`                                                                           | The full list of `X-Znx-Admin-Protocol` versions `@zanix/admin` still accepts, for a custom controller that wants to negotiate the same way.                                  |
+
+Unlike `TriggersAdminService`/`TriggersAdminRepository` and `TemplatesAdminService`/
+`TemplatesAdminRepository` above, the DLQ CRUD's own underlying service (`DLQAdminService`, from
+`@zanix/datamaster`) is **not** re-exported here — only `createDlqAdminController` (the composed
+HTTP layer) and the RTOs are. A custom `/admin/dlq`-shaped controller reuses
+`createDlqAdminController` directly with different `options`, rather than composing
+`DLQAdminService` into a hand-rolled controller the way a custom triggers/templates one could.
 
 ## See also
 
 - [`./admin-architecture.md`](./admin-architecture.md) — how this service's own admin API relates to
   the centralized `ZanixAdminHub` orchestrator, calling another service's admin API remotely
-  (`TriggersAdminClient`/`TemplatesAdminClient`), and standing up `ZanixAdminHub` alongside this
-  service.
+  (`TriggersAdminClient`/`TemplatesAdminClient`/`DlqAdminClient`), and standing up `ZanixAdminHub`
+  alongside this service.
 - [`../README.md`](../README.md) — package overview, installation, and basic usage.
 - `@zanix/admin`'s own README — the domain owner for the roles, protocol, and client/service classes
   re-exported here.

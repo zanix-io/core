@@ -39,7 +39,7 @@ Deno.test({
       assertEquals(body.resourceType, 'code-templates')
       assert(Array.isArray(body.items) && body.items.length > 0)
 
-      Zanix.stop()
+      await Zanix.stop()
     } finally {
       Deno.env.delete('MONGO_URI')
       Deno.env.delete('REDIS_URI')

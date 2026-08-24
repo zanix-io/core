@@ -1,4 +1,4 @@
-import type { SetupOptions } from 'typings/setup.ts'
+import type { ComposeOptions, SetupOptions } from 'typings/setup.ts'
 import type { BootstrapServerOptions, WebServerTypes } from '@zanix/server'
 import type { ActivatedApps } from '@zanix/app/runtime'
 import type { BehaviorOverride, ResourceBinding } from '@zanix/app'
@@ -89,6 +89,78 @@ function assertAdminTypesExhaustive<_T extends never>(): void {}
 assertAdminTypesExhaustive<Exclude<WebServerTypes, (typeof ADMIN_TYPES)[number]>>()
 
 /**
+ * Registers this project's own decorator metadata — cross-package core provider/connector slots
+ * (see {@link defineCoreMetadata}) and this project's own auto-discovered handlers, attributed to
+ * the default Application (see {@link defineLocalMetadata}) — without starting any server or
+ * activating any real infrastructure. The same registration {@link start} itself performs before
+ * its own `bootstrapServers()` call, isolated here for a process that only needs to introspect what
+ * `start()` WOULD register (e.g. a static OpenAPI generator reading
+ * `ProgramModule.routes.getRoutes('rest')` afterward) without actually booting.
+ *
+ * `options.admin: true` additionally registers `@zanix/admin`'s built-in local admin app
+ * (`defineLocalAdminApp()`) and its enabled sub-apps (`getLocalAdminSubApps()`) via
+ * `@zanix/app/runtime`'s `activateApps()` — the same manifests `start()`'s own `admin` option
+ * composes — so `/admin/service-token` and (when enabled) `/admin/triggers`/`/admin/templates`/
+ * `/admin/dlq` become visible via `ProgramModule.routes.getRoutes('rest')` too, under the `'admin'`
+ * Application. **Disabled by default**, matching `SetupOptions.admin`'s own default — see
+ * `ComposeOptions.admin`'s own doc.
+ *
+ * This is a genuinely safe inclusion, confirmed by reading every manifest `activateApps()` would
+ * touch for this call: `defineLocalAdminApp()`, `defineLocalTriggersApp()`,
+ * `defineLocalTemplatesApp()`, and `defineLocalDlqApp()` (`@zanix/admin`) each declare no
+ * `dependencies`/`resources`/`onStart`/`onStop`/`jobs` at all — `activateApps()`'s own
+ * `resolveResources()` (where a real `ZanixConnector`/DB connection would otherwise be constructed)
+ * and `runOnStart()` (where an arbitrary side effect would otherwise run) are therefore genuine
+ * no-ops for this specific, fixed set of apps. The only real work this option does is registration:
+ * `defineLocalAdminApp()`'s own `setup()` hook calls `@zanix/admin`'s `defineAdminMetadata()`,
+ * which registers plain `@Controller`-decorated classes (decorator evaluation is itself what adds
+ * the route) exactly like `defineLocalMetadata()`'s own auto-discovery does above — nothing here
+ * opens a connection, starts a timer, or leaves anything requiring an explicit
+ * `deactivateApps()`/`resource.close()` teardown call, so no such call is made or needed.
+ *
+ * Still deliberately excludes `apps` (`SetupOptions.apps`, named user-defined Zanix Apps) —
+ * unlike `admin` above, this is NOT a fixed, already-known set of manifests this function could
+ * safely activate on your behalf, for two independent reasons:
+ *   1. **Not statically discoverable at all.** A project's `apps` value is a plain JS object built
+ *      at runtime and handed directly to `start()`/`bootstrap()`'s own call — it's never
+ *      auto-discovered from decorated files the way `rootDir`'s scan (or `admin`'s own fixed
+ *      manifests, above) is. There is no "list of this project's apps" for `compose()` to read
+ *      without literally being passed the exact same `apps` value `start()` receives.
+ *   2. **Not safe even if it were.** An arbitrary Zanix App can declare real `dependencies`
+ *      (`activateApps()`'s `resolveResources()` would construct and health-gate a real
+ *      `ZanixConnector` — a live DB/cache connection — for a `required: true` slot) and/or a real
+ *      `onStart` hook (run by `runOnStart()`, and free to do anything at all — start its own timer,
+ *      open a socket, etc.) — neither of those is separable from route registration inside
+ *      `activateApps()`/`registerApp()` in the general case, so activating an arbitrary `apps` entry
+ *      here would break the "safe to call with zero side effects, nothing to tear down" guarantee
+ *      this function exists to provide.
+ *
+ * Net effect for a static consumer like `zanix generate openapi`: `admin`-scoped routes ARE
+ * discoverable via `compose(rootDir, { admin: true })`; a project's own named `apps`-scoped routes
+ * are NOT, and have no path to becoming so without a real `start()`/`bootstrap()` call (which
+ * activates real infrastructure) — this is a genuine, structural limitation of static introspection
+ * for `apps`, not an oversight.
+ *
+ * @param {string | string[]} [rootDir] - Base directory (or directories) to auto-discover this
+ *   project's own handlers from — same option as `SetupOptions.rootDir`.
+ * @param {ComposeOptions} [options] - See {@link ComposeOptions}.
+ */
+export const compose: (
+  rootDir?: string | string[],
+  options?: ComposeOptions,
+) => Promise<void> = async (rootDir, options = {}) => {
+  await defineCoreMetadata()
+  await ProgramModule.defineApplication(
+    DEFAULT_APPLICATION,
+    () => defineLocalMetadata(rootDir),
+  )
+
+  if (options.admin) {
+    await activateApps([defineLocalAdminApp(), ...getLocalAdminSubApps()])
+  }
+}
+
+/**
  * Main function to start all servers
  * @param options
  *
@@ -96,7 +168,7 @@ assertAdminTypesExhaustive<Exclude<WebServerTypes, (typeof ADMIN_TYPES)[number]>
  * `options.admin` (disabled by default) mounts `@zanix/admin`'s built-in triggers/templates/
  * service-token routes as a second server, bound to the `'admin'` Application — anchored
  * (id-prefixed) whenever `ADMIN_SERVER_ID` is set, a plain unprefixed server otherwise (see
- * `docs/HANDLERS.md`'s "Applications" and "Anchored servers" sections) — alongside the main one —
+ * `docs/handlers.md`'s "Applications" and "Anchored servers" sections) — alongside the main one —
  * `@zanix/server`'s route registry partitions routes by Application per route/resolver, so these
  * never leak onto the public `bootstrapServers` call further down, and the public app's own
  * (default-Application) routes never leak onto this admin server either. A given sub-server
@@ -158,7 +230,7 @@ export const start: (options?: SetupOptions) => Promise<void> = async (
       adminEnabled = !!options.admin
 
       // The app's own auto-discovered controllers (`defineLocalMetadata`'s directory scan) are
-      // explicitly attributed to the default Application (see `docs/HANDLERS.md`'s "Applications"
+      // explicitly attributed to the default Application (see `docs/handlers.md`'s "Applications"
       // section) — already the default when no scope is active, but wrapped explicitly here so
       // ownership stays traceable to this one call site rather than an absence of one, and stays
       // correct even if this ever runs nested inside another `defineApplication` scope later.

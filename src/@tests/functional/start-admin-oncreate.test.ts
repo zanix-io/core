@@ -30,6 +30,6 @@ Deno.test({
     assertEquals(adminServerId, 'admin-oncreate-test-rest')
 
     Deno.env.delete('ADMIN_SERVER_ID')
-    Zanix.stop()
+    await Zanix.stop()
   },
 })

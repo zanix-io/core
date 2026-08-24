@@ -64,7 +64,7 @@ Deno.test({
         'socket server should be reachable under the ADMIN_SERVER_ID-derived id',
       )
 
-      Zanix.stop()
+      await Zanix.stop()
     } finally {
       Deno.env.delete('ADMIN_SERVER_ID')
     }

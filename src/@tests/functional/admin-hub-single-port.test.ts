@@ -100,7 +100,7 @@ Deno.test({
       await triggers.body?.cancel()
     } finally {
       await ZanixAdminHub.stop()
-      Zanix.stop()
+      await Zanix.stop()
       Deno.env.delete('ADMIN_SERVER_ID')
       Deno.env.delete('ADMIN_HUB_SERVER_ID')
     }

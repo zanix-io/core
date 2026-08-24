@@ -36,7 +36,7 @@ Deno.test({
       assertEquals(response.status, 401)
       await response.body?.cancel()
 
-      Zanix.stop()
+      await Zanix.stop()
     } finally {
       Deno.env.delete('MONGO_URI')
       Deno.env.delete('REDIS_URI')

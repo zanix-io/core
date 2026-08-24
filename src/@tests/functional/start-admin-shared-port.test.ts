@@ -45,6 +45,6 @@ Deno.test({
     )
 
     Deno.env.delete('ADMIN_SERVER_ID')
-    Zanix.stop()
+    await Zanix.stop()
   },
 })

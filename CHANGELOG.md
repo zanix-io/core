@@ -5,7 +5,86 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-08-24
+
+### Added
+
+- **`Zanix.compose(rootDir?, options?)`** — registers this project's own decorator metadata
+  (cross-package core provider/connector slots plus this project's own auto-discovered handlers,
+  attributed to the default Application) without starting any server or activating any real
+  infrastructure. For a process that only needs to introspect what `Zanix.start()`/
+  `Zanix.bootstrap()` WOULD register (e.g. a static OpenAPI generator reading `@zanix/server`'s
+  `ProgramModule.routes.getRoutes('rest')` afterward). `options.admin: true` additionally registers
+  `@zanix/admin`'s built-in local admin app and its enabled sub-apps — verified safe (none of those
+  manifests declare `dependencies`/`resources`/`onStart`/`onStop`/`jobs`, so no real resource
+  activation ever happens for this fixed set). Still deliberately excludes `apps` composition — a
+  project's own named `apps` are neither statically discoverable nor guaranteed side-effect-free to
+  activate — see `compose()`'s own doc comment for the full rationale.
+- **`ConfigOptions.assets` / `Zanix.getAssetsService()` / `AssetService`** — unlike every other
+  `Zanix.setup()` option (env vars only), `assets` also constructs real infrastructure and
+  self-registers it, the same "construct real infrastructure, self-register it globally" shape
+  `logger.elastic` already has. `Zanix.setup({ assets })` builds `@zanix/datamaster/storage`'s
+  `S3ObjectStorage` (+ an optional local fallback/migration when `assets.localDir` is given) and
+  `@zanix/datamaster/files`'s `MongoFileRepository` (adapted via `@zanix/space/assets-api`'s
+  `createAssetRepositoryOverFiles`), wires them into a real `AssetService`, and registers it — read
+  it back with `Zanix.getAssetsService()`. The `s3Endpoint`/`s3AccessKey`/`s3SecretKey`/
+  `s3Bucket`/`encrypt`/`encryptVersion`/`filesModelName` fields each set their own
+  `S3_*`/`FILE_MODEL_NAME` env var, same "already-set env var wins" precedence as every other
+  `Zanix.setup()` option. See
+  [README: Assets](README.md#assets-zanixsetup-assets--builds-a-real-assetservice).
+- **`ConfigOptions.errors.uncaughtMonitor`** — wires `@zanix/server`'s new `UncaughtErrorMonitor`
+  (process-wide uncaught-exception/unhandled-rejection tracking), alongside the existing
+  `errors.logThrottle` (see Changed, below, for that field's own rename). No env-var fallback,
+  explicit options only, same as `logThrottle`.
+- **`/admin/dlq`** — the `@zanix/admin@^2.0.0` bump (this same release, see Changed below) brings a
+  fourth built-in admin API online, alongside `/admin/triggers`/`/admin/templates`/
+  `/admin/service-token`: manage `@zanix/datamaster`'s persisted Dead Letter Queue entries at
+  runtime (`push`/`get`/`list`/`requeue`/`discard`/`remove`). Opt-in, the same shape as
+  `/admin/templates` — only registered once `DLQ_MODEL_NAME` is set (see
+  `Zanix.setup({ dlq:
+  { modelName } })`, already present in this package before this release).
+  `Zanix.start({ admin:
+  true })`/`Zanix.compose(rootDir, { admin: true })` already activate it
+  automatically — both call `@zanix/admin`'s own `getLocalAdminSubApps()` generically, with no
+  per-resource list of its own — so no code change was needed in this package's own
+  `start()`/`compose()` to enable it. This release adds: `ADMIN_DLQ_ROLE`/`DlqAdminClient`
+  (re-exported from `@zanix/admin`) and
+  `createDlqAdminController`/`DiscardDLQEntryRTO`/`DLQEntryIdParamsRTO`/`ListDLQEntriesRTO`/
+  `PushDLQEntryRTO`/`RequeueDLQEntryRTO` (re-exported from `@zanix/datamaster/dlq-api`, the real
+  data owner — same "re-exported from the real owner unchanged" shape triggers/templates already
+  have) to this package's own `mod.ts`, a regression test proving the route is registered/auth-gated
+  via `Zanix.bootstrap()`, and full documentation. See
+  [docs/admin-apis.md](docs/admin-apis.md#-admin-apis).
+
+### Changed
+
+- **BREAKING: `ConfigOptions.errorLogThrottle` is renamed to `ConfigOptions.errors.logThrottle`**,
+  now grouped alongside the new `errors.uncaughtMonitor` (see Added, above) under one `errors` block
+  — both are "how many times before something happens" counters over an error stream, configured the
+  same way. `errorLogThrottle: {...}` becomes `errors: { logThrottle: {...} }`; the option's own
+  shape is otherwise unchanged. No dual-read compat shim.
+- **BREAKING: `setup()`'s logger auto-detect and `ConfigOptions.notifications` follow
+  `@zanix/datamaster`/`@zanix/notifications`'s own selector-based env-var renames.**
+  - `logger.elastic`'s zero-config auto-detect now reads `SEARCH_ENGINE` (`'elasticsearch'` or
+    `'opensearch'` enables it; `'meilisearch'` never does) instead of checking
+    `ELASTICSEARCH_URL`/`OPENSEARCH_URL` for presence.
+  - `ConfigOptions.notifications.databaseTemplates: boolean` is replaced by
+    `notifications.templatesBackend: 'local' | 'remote'`, setting the renamed `TEMPLATES_BACKEND`
+    instead of the now-removed `DATABASE_TEMPLATES`. `notifications.templatesModel` is unchanged,
+    but only takes effect alongside `templatesBackend: 'local'`.
+
+  No dual-read/compat shim, matching both upstream packages' own hard-rename stance. Requires
+  `@zanix/datamaster` and `@zanix/notifications` versions carrying their own renames.
+- `createTriggersAdminController`, `CreateTriggerRTO`, `UpdateTriggerRTO`, `TriggerModelParamsRTO`
+  now source from `@zanix/datamaster/triggers-api`; `CreateTemplateRTO`, `UpdateTemplateRTO`,
+  `TemplateParamsRTO` now source from `@zanix/notifications/templates-api` — the packages that
+  actually author them. No change to the public symbols this package exports.
+
+### Fixed
+
+- `deno lint`'s own `@zanix/utils` plugin (`deno-zanix-plugin`) is now version-pinned (`^3.0.0`),
+  matching every other `@zanix/utils` import in `deno.jsonc` — it used to resolve unpinned, so a
+  lint run could silently pick up a newer, unreviewed plugin version.
 
 ## [1.1.0] - 2026-08-17
 
@@ -199,7 +278,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   `@zanix/server`'s new Discovery mechanism (`@zanix/admin`'s `createTemplatesDiscoveryProvider()`),
   for a central sync job/aggregator to snapshot this service's current templates without going
   through the authenticated CRUD surface. See `docs/admin-apis.md` and `@zanix/server`'s
-  `docs/HANDLERS.md#discovery`.
+  `docs/handlers.md#discovery`.
 
 ### Changed (breaking)
 

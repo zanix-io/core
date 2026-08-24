@@ -30,6 +30,6 @@ Deno.test({
     // The first call, unaffected by the rejected second one, must still complete normally.
     await first
 
-    Zanix.stop()
+    await Zanix.stop()
   },
 })

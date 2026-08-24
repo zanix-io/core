@@ -31,7 +31,7 @@ Deno.test({
         'the env-derived id must NOT have been used once an explicit id was passed',
       )
 
-      Zanix.stop()
+      await Zanix.stop()
     } finally {
       Deno.env.delete('ADMIN_SERVER_ID')
     }

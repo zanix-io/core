@@ -76,6 +76,6 @@ Deno.test({
     assertEquals(serviceToken.status, 400) // garbage assertion, but not a 404 — the route exists
     await serviceToken.body?.cancel()
 
-    Zanix.stop()
+    await Zanix.stop()
   },
 })

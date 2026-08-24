@@ -70,6 +70,6 @@ Deno.test({
     await Promise.all(publicChecks)
 
     Deno.env.delete('ADMIN_SERVER_ID')
-    Zanix.stop()
+    await Zanix.stop()
   },
 })

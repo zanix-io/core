@@ -39,9 +39,9 @@ within the Zanix framework.
   **WebSocket**, and **SSR** servers.
 - **Lightweight and scalable project bootstrapping**, designed to grow seamlessly with your
   application.
-- **Built-in, opt-in admin APIs** for managing persisted triggers and notification templates at
-  runtime, plus a background-worker mode for processes that only run jobs — see
-  [Admin APIs](#-admin-apis) and [Basic Usage](#-basic-usage) below.
+- **Built-in, opt-in admin APIs** for managing persisted triggers, notification templates, and Dead
+  Letter Queue entries at runtime, plus a background-worker mode for processes that only run jobs —
+  see [Admin APIs](#-admin-apis) and [Basic Usage](#-basic-usage) below.
 
 ## 📦 Installation
 
@@ -118,10 +118,46 @@ This loads the same cross-package core dependencies as `Zanix.start()` — inclu
 `Zanix.stopWorker()` closes the worker's connector connections but does not itself terminate the
 process — call it before your own shutdown logic exits the process, not as a replacement for it.
 
+### Static composition (no boot)
+
+For a process that only needs to introspect what `Zanix.start()`/`Zanix.bootstrap()` WOULD register
+— e.g. a CLI tool statically generating an OpenAPI spec from `@zanix/server`'s
+`ProgramModule.routes.getRoutes('rest')` — use `Zanix.compose()` instead. It registers this
+project's own decorator metadata (cross-package core provider/connector slots, plus this project's
+own auto-discovered handlers, attributed to the default Application) without starting any server or
+activating any real infrastructure:
+
+```typescript
+import Zanix from 'jsr:@zanix/core@[version]'
+
+await Zanix.compose()
+```
+
+Pass `{ admin: true }` as a second argument to also register `@zanix/admin`'s built-in local admin
+app (and its enabled triggers/templates/dlq sub-apps) — the same manifests `start()`'s own `admin`
+option composes — so `/admin/service-token` and friends become visible via `getRoutes('rest')` too:
+
+```typescript
+await Zanix.compose(undefined, { admin: true })
+```
+
+This is safe because none of those manifests declare `dependencies`/`resources`/`onStart`/
+`onStop`/`jobs` — real resource construction and arbitrary lifecycle side effects (the actual thing
+`compose()` protects against) never happen for this fixed set.
+
+`Zanix.compose()` still deliberately excludes `apps` composition — unlike `admin` (a fixed set of
+manifests known in advance), a project's own named `apps` are plain JS objects handed directly to
+`start()`/`bootstrap()` at runtime, never auto-discoverable from decorated files the way `rootDir`'s
+scan is; and even if they were discoverable, an arbitrary Zanix App can declare real `dependencies`/
+`onStart` that `activateApps()` would genuinely activate (a live DB connection, an arbitrary side
+effect) — which would break the "safe to call with zero side effects" guarantee this method exists
+to provide. A static consumer like `zanix generate openapi` therefore still can't see a project's
+own `apps`-scoped routes — only `admin`'s.
+
 ### SSR pages: standalone vs. named apps
 
 `server.ssr` works exactly like `server.rest`/`server.graphql`/`server.socket` above — a plain
-`ZanixSsrController` (see `@zanix/server`'s own `docs/HANDLERS.md` → "SSR" for the full handler API)
+`ZanixSsrController` (see `@zanix/server`'s own `docs/handlers.md` → "SSR" for the full handler API)
 attributes to the default `'main'` Application with no extra setup:
 
 ```typescript
@@ -200,49 +236,86 @@ persistence), and non-secret `@zanix/datamaster`/`@zanix/notifications` config (
 import Zanix from 'jsr:@zanix/core@[version]'
 
 Zanix.setup({
-  errorLogThrottle: { threshold: 100, windowMs: 10 * 60_000 },
+  errors: { logThrottle: { threshold: 100, windowMs: 10 * 60_000 } },
   logger: { elastic: true },
   database: { seeders: false, triggersModel: 'my-triggers' },
-  notifications: { databaseTemplates: true },
+  notifications: { templatesBackend: 'local' },
   dlq: { modelName: 'my-dlq', encryptPayload: true },
 })
 
 await Zanix.start()
 ```
 
-**Call it before `Zanix.start()`/`Zanix.startWorker()`.** `database`/`notifications`/`dlq` options
-work by setting env vars (`Deno.env.set`) that `@zanix/datamaster`/`@zanix/notifications` read at
-their own module-import time — calling `Zanix.setup()` after `Zanix.start()` has already imported
-those modules has no effect on them. `errorLogThrottle`/`logger` have no such ordering requirement.
+**Call it before `Zanix.start()`/`Zanix.startWorker()`.** `database`/`notifications`/`dlq`/`assets`
+options work by setting env vars (`Deno.env.set`) that `@zanix/datamaster`/`@zanix/notifications`
+read at their own module-import time — calling `Zanix.setup()` after `Zanix.start()` has already
+imported those modules has no effect on them. `errors`/`logger` have no such ordering requirement.
 
-**An already-set env var always wins.** Every `database`/`notifications`/`dlq` option here only sets
-its env var when that var isn't already present (an empty string counts as not present) — the
-deployment platform/container's own configuration is the authority; these options are just the
+**An already-set env var always wins.** Every `database`/`notifications`/`dlq`/`assets` option here
+only sets its env var when that var isn't already present (an empty string counts as not present) —
+the deployment platform/container's own configuration is the authority; these options are just the
 app-level default for when nothing else specified a value. To force a value regardless of the
 environment, set it directly via `Deno.env.set()` instead of through `Zanix.setup()`.
 
-| Option                                            | Sets / wires                                                                                                                                                                                                                                                                                                                      |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `errorLogThrottle`                                | `@zanix/server`'s `ErrorLogThrottle` — no env var fallback, explicit options only.                                                                                                                                                                                                                                                |
-| `logger.elastic`                                  | Elasticsearch/OpenSearch-backed logging. `true` (or leaving it unset while `ELASTICSEARCH_URL`/`OPENSEARCH_URL` is set) enables it — same env vars `Zanix.start()`'s zero-config `search` connector already reads; `false` opts out even if they're set (logs then fall back to `@zanix/utils`'s own default file-based storage). |
-| `logger.formatter` / `logger.disableGlobalAssign` | Forwarded as-is to `@zanix/utils`'s `Logger`. There's no `storage.save` option here — `setup()` always decides how logs get saved (via `elastic`, or its own default fallback); construct your own `new Logger({storage: {save: ...}})` directly if you need a fully custom, non-Elasticsearch save function.                     |
-| `database.seeders`                                | `DATABASE_SEEDERS`                                                                                                                                                                                                                                                                                                                |
-| `database.triggersModel`                          | `TRIGGERS_MODEL_NAME`                                                                                                                                                                                                                                                                                                             |
-| `database.seedModel`                              | `SEED_MODEL_NAME`                                                                                                                                                                                                                                                                                                                 |
-| `database.triggersPollInterval`                   | `TRIGGERS_POLL_INTERVAL`                                                                                                                                                                                                                                                                                                          |
-| `database.triggersChangeStream`                   | `TRIGGERS_CHANGE_STREAM`                                                                                                                                                                                                                                                                                                          |
-| `notifications.databaseTemplates`                 | `DATABASE_TEMPLATES`                                                                                                                                                                                                                                                                                                              |
-| `notifications.templatesModel`                    | `TEMPLATES_MODEL_NAME`                                                                                                                                                                                                                                                                                                            |
-| `dlq.modelName`                                   | `DLQ_MODEL_NAME` — names `DLQProvider`'s collection.                                                                                                                                                                                                                                                                              |
-| `dlq.encryptPayload`                              | `DLQ_ENCRYPT_PAYLOAD` — forces `registerDLQModel`'s `encryptPayload` on/off regardless of what's passed to that call directly.                                                                                                                                                                                                    |
-| `dlq.defaultLeaseMs`                              | `DLQ_DEFAULT_LEASE_MS` — default `DLQProvider.claim()` lease duration (ms) when no per-call `leaseTtlMs` is passed.                                                                                                                                                                                                               |
+| Option                                                                                          | Sets / wires                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `errors.logThrottle`                                                                            | `@zanix/server`'s `ErrorLogThrottle` — no env var fallback, explicit options only.                                                                                                                                                                                                                                                                                                                                                   |
+| `errors.uncaughtMonitor`                                                                        | `@zanix/server`'s `UncaughtErrorMonitor` — no env var fallback, explicit options only.                                                                                                                                                                                                                                                                                                                                               |
+| `logger.elastic`                                                                                | Elasticsearch/OpenSearch-backed logging. `true` (or leaving it unset while `SEARCH_ENGINE` is `elasticsearch`/`opensearch`) enables it — same `SEARCH_ENGINE`/`SEARCH_URL` env vars `Zanix.start()`'s zero-config `search` connector already reads; `false` opts out even if one of those is selected (logs then fall back to `@zanix/utils`'s own default file-based storage). `SEARCH_ENGINE=meilisearch` never auto-enables this. |
+| `logger.formatter` / `logger.disableGlobalAssign`                                               | Forwarded as-is to `@zanix/utils`'s `Logger`. There's no `storage.save` option here — `setup()` always decides how logs get saved (via `elastic`, or its own default fallback); construct your own `new Logger({storage: {save: ...}})` directly if you need a fully custom, non-Elasticsearch save function.                                                                                                                        |
+| `database.seeders`                                                                              | `DATABASE_SEEDERS`                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `database.triggersModel`                                                                        | `TRIGGERS_MODEL_NAME`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `database.seedModel`                                                                            | `SEED_MODEL_NAME`                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `database.triggersPollInterval`                                                                 | `TRIGGERS_POLL_INTERVAL`                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `database.triggersChangeStream`                                                                 | `TRIGGERS_CHANGE_STREAM`                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `notifications.templatesBackend`                                                                | `TEMPLATES_BACKEND` — `'local'`/`'remote'`; `'remote'`'s own `TEMPLATES_SERVICE_URL`/etc. aren't wired here, set them directly.                                                                                                                                                                                                                                                                                                      |
+| `notifications.templatesModel`                                                                  | `TEMPLATES_MODEL_NAME`                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `dlq.modelName`                                                                                 | `DLQ_MODEL_NAME` — names `DLQProvider`'s collection.                                                                                                                                                                                                                                                                                                                                                                                 |
+| `dlq.encryptPayload`                                                                            | `DLQ_ENCRYPT_PAYLOAD` — forces `registerDLQModel`'s `encryptPayload` on/off regardless of what's passed to that call directly.                                                                                                                                                                                                                                                                                                       |
+| `dlq.defaultLeaseMs`                                                                            | `DLQ_DEFAULT_LEASE_MS` — default `DLQProvider.claim()` lease duration (ms) when no per-call `leaseTtlMs` is passed.                                                                                                                                                                                                                                                                                                                  |
+| `assets.s3Endpoint` / `s3AccessKey` / `s3SecretKey` / `s3Bucket` / `encrypt` / `encryptVersion` | `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` / `S3_ENCRYPT` / `S3_ENCRYPT_VERSION`.                                                                                                                                                                                                                                                                                                                               |
+| `assets.filesModelName`                                                                         | `FILE_MODEL_NAME` — names `MongoFileRepository`'s collection.                                                                                                                                                                                                                                                                                                                                                                        |
+
+### Assets: `Zanix.setup({ assets })` builds a real `AssetService`
+
+Unlike `database`/`notifications`/`dlq` above (env vars only), `assets` **also constructs real
+infrastructure** and self-registers it — the same shape `logger.elastic` already has (`new
+Logger()`
+self-registers globally; `import logger from '@zanix/logger'` reads it back).
+`Zanix.setup({ assets })` builds `S3ObjectStorage` (+ an optional local fallback/migration, when
+`localDir` is given) and `MongoFileRepository` (adapted via `@zanix/space/assets-api`'s
+`createAssetRepositoryOverFiles`), wires them into a real `AssetService`, and registers it — read it
+back with `Zanix.getAssetsService()`:
+
+```typescript
+import Zanix from 'jsr:@zanix/core@[version]'
+import { defineSpaceApp } from 'jsr:@zanix/space@[version]'
+
+Zanix.setup({
+  assets: { s3Bucket: 'prod-assets', localDir: './local-assets' },
+})
+
+const app = defineSpaceApp({
+  name: 'storefront',
+  assetsApi: { service: Zanix.getAssetsService()! },
+})
+
+await Zanix.start({ apps: { storefront: { definition: app, server: { ssr: {} } } } })
+```
+
+There is no separate "enabled" flag — passing the `assets` block at all (even `{}`) is the
+activation signal; every field, including `localDir`, is optional and each sets its own env var only
+when not already present, same precedence as every other option above. Omit `assets` entirely and
+nothing is constructed, at zero cost. See `@zanix/datamaster`'s own
+[Storage docs](https://jsr.io/@zanix/datamaster/doc/~/S3ObjectStorage) for what each
+`s3*`/`encrypt*` field configures, and `@zanix/space`'s own docs for `SpaceAppConfig.assetsApi`.
 
 ---
 
 ## 🔐 Admin APIs
 
 `Zanix.start({ admin: true })` bootstraps a second, **anchored, `'admin'`-Application** server
-(never reachable through the public `server` options above) that exposes three built-in APIs, all
+(never reachable through the public `server` options above) that exposes four built-in APIs, all
 owned by `@zanix/admin` and re-exported from this package's own `mod.ts` unchanged. **Disabled by
 default** — omit `admin` (or pass `false`) and none of this is registered at all:
 
@@ -255,24 +328,27 @@ await Zanix.start({ admin: { rest: { port: 4000 } } }) // enabled, explicit REST
 - **`/admin/triggers`** — manage `@zanix/datamaster`'s persisted trigger configurations at runtime.
   Always registered once `admin` is enabled; set `TRIGGERS_MODEL_NAME=false` to disable.
 - **`/admin/templates`** — manage `@zanix/notifications`'s Handlebars templates. Only registered
-  once the app has also opted into DB-backed templates (`DATABASE_TEMPLATES=true` or
-  `TEMPLATES_MODEL_NAME` set).
+  once the app has selected `TEMPLATES_BACKEND=local` (a bare `TEMPLATES_MODEL_NAME` alone has no
+  effect anymore — see `@zanix/notifications`'s `templatesBackendMode()`).
+- **`/admin/dlq`** — manage `@zanix/datamaster`'s persisted Dead Letter Queue entries. Opt-in, the
+  same shape as `/admin/templates` — only registered once `DLQ_MODEL_NAME` is set (see
+  `Zanix.setup({ dlq: { modelName } })` above, or set the env var directly).
 - **`/admin/service-token`** — machine-to-machine credential exchange (`exchangeServiceCredential`):
   POST `{ assertion }`, get back a `type: 'api'` access token to use against this service's other
   admin/business APIs. Registered whenever `admin` is enabled, unauthenticated by design.
 
-The triggers and templates APIs require a role (`ADMIN_ROLE`, or `ADMIN_TRIGGERS_ROLE`/
-`ADMIN_TEMPLATES_ROLE` for just one of the two), via `@zanix/auth`'s `@AuthTokenValidation`, and
-accept either a human admin's `type: 'user'` token or a machine caller's `type: 'api'` one on the
-same route. Set **`ADMIN_SERVER_ID`** to pin the admin API's URL path prefix to a stable address
-instead of the random one generated by default. `@zanix/admin`'s own `TriggersAdminClient`/
-`TemplatesAdminClient` (re-exported here) let a consumer call another service's admin API remotely
-without hand-rolling an HTTP client, and `ZanixAdminHub` (also re-exported) is `@zanix/admin`'s own
-reference deployable entrypoint, for standing up the centralized orchestrator alongside this
-service's own business API in the same process — **`admin` on `Zanix.start()` is safe to also enable
-in that same process**; the two register under distinct Applications (`ADMIN_APPLICATION` vs.
-`ZanixAdminHub`'s own `ADMIN_HUB_APPLICATION`), so there's no collision and no runtime guard against
-it.
+The triggers, templates, and DLQ APIs each require a role (`ADMIN_ROLE`, or
+`ADMIN_TRIGGERS_ROLE`/`ADMIN_TEMPLATES_ROLE`/`ADMIN_DLQ_ROLE` for just one of the three), via
+`@zanix/auth`'s `@AuthTokenValidation`, and accept either a human admin's `type: 'user'` token or a
+machine caller's `type: 'api'` one on the same route. Set **`ADMIN_SERVER_ID`** to pin the admin
+API's URL path prefix to a stable address instead of the random one generated by default.
+`@zanix/admin`'s own `TriggersAdminClient`/`TemplatesAdminClient`/`DlqAdminClient` (re-exported
+here) let a consumer call another service's admin API remotely without hand-rolling an HTTP client,
+and `ZanixAdminHub` (also re-exported) is `@zanix/admin`'s own reference deployable entrypoint, for
+standing up the centralized orchestrator alongside this service's own business API in the same
+process — **`admin` on `Zanix.start()` is safe to also enable in that same process**; the two
+register under distinct Applications (`ADMIN_APPLICATION` vs. `ZanixAdminHub`'s own
+`ADMIN_HUB_APPLICATION`), so there's no collision and no runtime guard against it.
 
 See [`docs/admin-apis.md`](./docs/admin-apis.md) for the full guide: the `admin` option's shape and
 port-sharing rules, role assignment, the `X-Znx-Admin-Protocol` header, and `ADMIN_SERVER_ID`; see

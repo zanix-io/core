@@ -64,6 +64,6 @@ Deno.test({
     assertEquals(socketId, 'admin-scope-test-socket')
 
     Deno.env.delete('ADMIN_SERVER_ID')
-    Zanix.stop()
+    await Zanix.stop()
   },
 })

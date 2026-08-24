@@ -107,7 +107,7 @@ Deno.test({
       assertEquals(res.status, 200)
       await res.body?.cancel()
     } finally {
-      Zanix.stop()
+      await Zanix.stop()
     }
   },
 })
@@ -169,7 +169,7 @@ Deno.test({
       assertEquals(res.status, 200)
       assertEquals(await res.text(), 'zanix-app-ssr-only-ok')
     } finally {
-      Zanix.stop()
+      await Zanix.stop()
     }
   },
 })
@@ -210,7 +210,7 @@ Deno.test({
       assertEquals(res.status, 200)
       assertEquals(await res.text(), 'main-ssr-ok')
     } finally {
-      Zanix.stop()
+      await Zanix.stop()
     }
   },
 })
@@ -268,7 +268,7 @@ Deno.test({
       )
       assertEquals(restThroughSsr.status, 404)
     } finally {
-      Zanix.stop()
+      await Zanix.stop()
     }
   },
 })
@@ -300,7 +300,7 @@ Deno.test({
         'onStart must still run even though this app never gets its own server',
       )
     } finally {
-      Zanix.stop()
+      await Zanix.stop()
     }
   },
 })
@@ -364,7 +364,7 @@ Deno.test({
         'both apps must see the exact same resource instance',
       )
     } finally {
-      Zanix.stop()
+      await Zanix.stop()
     }
   },
 })
@@ -403,7 +403,7 @@ Deno.test({
 
       assertEquals(seen, customDiscount)
     } finally {
-      Zanix.stop()
+      await Zanix.stop()
     }
   },
 })
@@ -489,7 +489,7 @@ Deno.test({
       assertEquals(resB.status, 200)
       await resB.body?.cancel()
 
-      Zanix.stop()
+      await Zanix.stop()
     } finally {
       await Deno.remove(dirA, { recursive: true })
       await Deno.remove(dirB, { recursive: true })

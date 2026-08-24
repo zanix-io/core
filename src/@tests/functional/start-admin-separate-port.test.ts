@@ -42,6 +42,6 @@ Deno.test({
     assertEquals(publicAddr.port, MAIN_PORT)
 
     Deno.env.delete('ADMIN_SERVER_ID')
-    Zanix.stop()
+    await Zanix.stop()
   },
 })

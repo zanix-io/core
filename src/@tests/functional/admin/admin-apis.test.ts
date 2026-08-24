@@ -43,9 +43,10 @@ Deno.test({
 
     // Proves `defineAdminMetadata()` actually registered the route (auth-gated, reachable, not a
     // 404) — not just that the import didn't throw. The deep auth-behavior checks (the `api`-type
-    // token path, a garbage-token 403, a valid request's 200) are covered by `@zanix/admin`'s own
-    // tests, the actual owner of `createTriggersAdminController` — see its
-    // `local-triggers.handler.test.ts` (unit) and `triggers-admin-api.test.ts` (functional).
+    // token path, a garbage-token 403, a valid request's 200) are covered elsewhere: the
+    // CRUD-forwarding logic in `@zanix/datamaster`'s own `local-triggers.handler.test.ts` (unit,
+    // the actual owner of `createTriggersAdminController`), and the composed HTTP-dispatch/auth
+    // wiring in `@zanix/admin`'s own `triggers-admin-api.test.ts` (functional).
     const unauthenticated = await fetch(`${baseUrl}/admin/triggers/list`)
     assertEquals(unauthenticated.status, 401)
     await unauthenticated.body?.cancel()
@@ -63,6 +64,6 @@ Deno.test({
     await Promise.all(publicChecks)
 
     Deno.env.delete('ADMIN_SERVER_ID')
-    Zanix.stop()
+    await Zanix.stop()
   },
 })
