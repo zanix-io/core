@@ -1,6 +1,6 @@
 import { assertThrows } from '@std/assert'
 import { registerJob } from '@zanix/asyncmq/jobs'
-import { DEFAULT_TRIGGER_JOBS } from '@zanix/database'
+import { DEFAULT_TRIGGER_JOBS } from '@zanix/datamaster/database'
 import { defineCoreMetadata } from 'utils/metadata.ts'
 
 console.error = () => {}

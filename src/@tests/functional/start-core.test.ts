@@ -1,6 +1,7 @@
 import { assertSpyCalls, stub } from '@std/testing/mock'
 import { assert } from '@std/assert'
-import { isDlqResourceEnabled, isTriggersResourceEnabled } from '@zanix/database'
+import { isDlqResourceEnabled } from '@zanix/datamaster/dlq'
+import { isTriggersResourceEnabled } from '@zanix/datamaster/database'
 import { isTemplatesResourceEnabled } from '@zanix/notifications'
 import { getLocalAdminSubApps } from '@zanix/admin'
 import Zanix from '../../../mod.ts'

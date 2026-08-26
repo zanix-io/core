@@ -1,8 +1,14 @@
-import { collectFiles, getRootDir } from '@zanix/helpers/files'
+import { collectFiles, getRootDir } from '@zanix/helpers'
 import { ZANIX_SERVER_MODULES } from '@zanix/server'
 import { setTaskerUrl } from '@zanix/asyncmq/worker'
 import { join } from '@std/path'
 import { registerPendingTriggerActionJobs } from '../modules/jobs/triggers.ts'
+import {
+  ASYNCMQ_CORE_SPECIFIER,
+  AUTH_CORE_SPECIFIER,
+  DATAMASTER_CORE_SPECIFIER,
+  NOTIFICATIONS_CORE_SPECIFIER,
+} from '../modules/lazy/specifiers.ts'
 
 /**
  * Registers `@zanix/core`'s own internal-process worker-thread bootstrap module
@@ -30,18 +36,28 @@ export const defineLocalMetadata = async (
   await Promise.all(imports)
 }
 
+/**
+ * Registers every core connector/provider (`@zanix/datamaster`, `@zanix/auth`,
+ * `@zanix/notifications`, `@zanix/asyncmq`, each via their own `./core` subpath) — called
+ * unconditionally by `start()`/`startWorker()`, so the laziness in the four imports below isn't
+ * about skipping the call at runtime, it's about keeping this specifier out of the STATIC module
+ * graph: each is a non-literal constant from `lazy/specifiers.ts`, never an inline
+ * `import('literal-string')`, so a consumer that only imports `.`/`./bootstrap` to read a type (and
+ * never actually calls `start()`/`startWorker()`) never resolves — and so never materializes the
+ * npm packages behind — any of the four.
+ */
 export const defineCoreMetadata = async () => {
   const imports: Promise<unknown>[] = []
 
   // Loading Zanix datamaster core
-  imports.push(import('@zanix/datamaster/core'))
+  imports.push(import(DATAMASTER_CORE_SPECIFIER))
   // Loading Zanix auth core
-  imports.push(import('@zanix/auth/core'))
+  imports.push(import(AUTH_CORE_SPECIFIER))
   // Loading Zanix notifications core — self-registers the built-in `mail` trigger-action job
   // descriptor (see that package's own doc); must finish before the registration below drains it.
-  imports.push(import('@zanix/notifications/core'))
+  imports.push(import(NOTIFICATIONS_CORE_SPECIFIER))
   // Loading Zanix asyncmq core
-  imports.push(import('@zanix/asyncmq/core'))
+  imports.push(import(ASYNCMQ_CORE_SPECIFIER))
 
   await Promise.all(imports)
 

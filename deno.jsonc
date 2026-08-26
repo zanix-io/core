@@ -1,6 +1,6 @@
 {
   "name": "@zanix/core",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "nodeModulesDir": "auto",
   "zanix": {
     "project": "library"
@@ -35,7 +35,7 @@
       ".dist"
     ],
     "plugins": [
-      "jsr:@zanix/utils@^3.0.0/linter/deno-zanix-plugin"
+      "jsr:@zanix/utils@^4.0.0/linter/deno-zanix-plugin"
     ],
     "report": "pretty"
   },
@@ -54,38 +54,63 @@
     "@std/path": "jsr:@std/path@0.224",
     "@std/assert": "jsr:@std/assert@0.224",
     "@std/testing": "jsr:@std/testing@1.0.9",
-    "@zanix/admin": "jsr:@zanix/admin@^2.0.0",
-    "@zanix/app": "jsr:@zanix/app@^0.2.0",
-    "@zanix/app/runtime": "jsr:@zanix/app@^0.2.0/runtime",
-    "@zanix/server": "jsr:@zanix/server@^3.4.0",
-    "@zanix/asyncmq/core": "jsr:@zanix/asyncmq@^0.7.0/core",
-    "@zanix/asyncmq/jobs": "jsr:@zanix/asyncmq@^0.7.0",
-    "@zanix/asyncmq/worker": "jsr:@zanix/asyncmq@^0.7.0/worker",
-    "@zanix/notifications": "jsr:@zanix/notifications@^0.5.0",
-    "@zanix/notifications/core": "jsr:@zanix/notifications@^0.5.0/core",
-    "@zanix/notifications/templates-api": "jsr:@zanix/notifications@^0.5.0/templates-api",
-    "@zanix/database": "jsr:@zanix/datamaster@^1.5.0",
-    "@zanix/datamaster/core": "jsr:@zanix/datamaster@^1.5.0/core",
-    "@zanix/datamaster/triggers-api": "jsr:@zanix/datamaster@^1.5.0/triggers-api",
-    "@zanix/datamaster/dlq-api": "jsr:@zanix/datamaster@^1.5.0/dlq-api",
-    "@zanix/datamaster/observability": "jsr:@zanix/datamaster@^1.5.0/observability",
-    "@zanix/datamaster/storage": "jsr:@zanix/datamaster@^1.5.0/storage",
-    "@zanix/datamaster/files": "jsr:@zanix/datamaster@^1.5.0/files",
-    "@zanix/space/assets-api": "jsr:@zanix/space@^0.1.0/assets-api",
-    "@zanix/logger": "jsr:@zanix/utils@^3.1.2/logger",
-    "@zanix/errors": "jsr:@zanix/utils@^3.1.2/errors",
-    "@zanix/helpers": "jsr:@zanix/utils@^3.1.2/helpers",
-    "@zanix/helpers/files": "jsr:@zanix/utils@^3.1.2/helpers",
-    "@zanix/types": "jsr:@zanix/utils@^3.1.2/types",
-    "@zanix/validator": "jsr:@zanix/utils@^3.1.2/validator",
-    "@zanix/auth": "jsr:@zanix/auth@^0.8.0",
-    "@zanix/auth/core": "jsr:@zanix/auth@^0.8.0/core",
+    "@zanix/admin": "jsr:@zanix/admin@^2.1.0",
+    "@zanix/admin/hub": "jsr:@zanix/admin@^2.1.0/zanix-admin-hub",
+    // Floor pinned at `0.2.1`, not `^0.2.0`: the real published `@zanix/app@0.2.0` still internally
+    // pinned `@zanix/server@^3.4.0` (the pre-split version, bundling `graphql`/`amqplib`
+    // unconditionally in its webserver/discovery machinery) — confirmed fixed in `0.2.1`
+    // specifically, via a real, isolated `deno info --json --min-dep-age=0` repro against each
+    // version directly (`0.2.0` still resolves `amqplib`/`graphql`/`mongoose`/`redis` from
+    // `/runtime` alone; `0.2.1` resolves none of them). `^0.2.1` still accepts a future `0.2.x`
+    // patch release, it just excludes the one specific version with the bug.
+    "@zanix/app": "jsr:@zanix/app@^0.2.1",
+    "@zanix/app/runtime": "jsr:@zanix/app@^0.2.1/runtime",
+    "@zanix/server": "jsr:@zanix/server@^4.0.0",
+    "@zanix/server/graphql": "jsr:@zanix/server@^4.0.0/graphql",
+    // Deliberately absent: `@zanix/asyncmq/core`/`@zanix/notifications/core`/`@zanix/datamaster/core`/
+    // `@zanix/auth/core` — no file in this package imports any of them directly. Each is reached
+    // through its own lazy, non-literal `*_CORE_SPECIFIER` constant in `modules/lazy/specifiers.ts`
+    // instead (see that file's own doc and `defineCoreMetadata`'s own doc, `utils/metadata.ts`).
+    "@zanix/asyncmq/jobs": "jsr:@zanix/asyncmq@^0.8.0/jobs",
+    "@zanix/asyncmq/worker": "jsr:@zanix/asyncmq@^0.8.0/worker",
+    "@zanix/notifications/templates-api": "jsr:@zanix/notifications@^0.7.0/templates-api",
+    "@zanix/datamaster/database": "jsr:@zanix/datamaster@^1.8.0/database",
+    "@zanix/datamaster/dlq": "jsr:@zanix/datamaster@^1.8.0/dlq",
+    "@zanix/datamaster/triggers-api": "jsr:@zanix/datamaster@^1.8.0/triggers-api",
+    "@zanix/datamaster/dlq-api": "jsr:@zanix/datamaster@^1.8.0/dlq-api",
+    "@zanix/datamaster/observability": "jsr:@zanix/datamaster@^1.8.0/observability",
+    "@zanix/logger": "jsr:@zanix/utils@^4.0.0/logger",
+    "@zanix/errors": "jsr:@zanix/utils@^4.0.0/errors",
+    "@zanix/helpers": "jsr:@zanix/utils@^4.0.0/helpers",
+    "@zanix/types": "jsr:@zanix/utils@^4.0.0/types",
+    "@zanix/validator": "jsr:@zanix/utils@^4.0.0/validator",
+    // Deliberately absent: the bare `@zanix/auth` root — no file in this package imports it
+    // directly either (only its own `/core`, itself reached lazily — see the note above).
     "typings/": "./src/typings/",
     "utils/": "./src/utils/",
     "modules/": "./src/modules/"
   },
+  "scopes": {
+    // `@zanix/space/assets-api`/`@zanix/datamaster/storage`/`/files`/`@zanix/notifications` (bare
+    // root) are deliberately absent from the top-level `imports` map above (see
+    // `modules/lazy/specifiers.ts`'s own doc) — this package's own test suite still needs the real,
+    // precise types/values (`AssetService`, `TEMPLATES_BACKEND_ENV`/`TEMPLATES_MODEL_ENV`, mainly)
+    // to assert against what `setup()`/`start()` actually build, without reintroducing the
+    // materialization problem for any real consumer: a `scopes` entry only applies to files whose
+    // own path falls under this prefix, so it never affects `@zanix/core`'s published surface.
+    "./src/@tests/": {
+      "@zanix/space/assets-api": "jsr:@zanix/space@^0.2.0/assets-api",
+      "@zanix/datamaster/storage": "jsr:@zanix/datamaster@^1.8.0/storage",
+      "@zanix/datamaster/files": "jsr:@zanix/datamaster@^1.8.0/files",
+      "@zanix/notifications": "jsr:@zanix/notifications@^0.7.0"
+    }
+  },
   "exports": {
-    ".": "./mod.ts"
+    ".": "./mod.ts",
+    // `Zanix` on its own, apart from root `.`'s neighboring admin-domain re-exports (see
+    // `src/modules/zanix.ts`'s own doc) — a caller that wants ONLY the "just embed Zanix" shortcut
+    // should import this instead of root.
+    "./bootstrap": "./src/modules/zanix.ts"
   },
   "publish": {
     "exclude": [

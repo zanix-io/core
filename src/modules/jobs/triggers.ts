@@ -1,11 +1,11 @@
 import type { JobDefinition } from '@zanix/asyncmq/jobs'
-import type { TriggerActionJobHandler, TriggerActions } from '@zanix/database'
+import type { TriggerActionJobHandler, TriggerActions } from '@zanix/datamaster/database'
 
 import {
   DEFAULT_TRIGGER_JOBS,
   getRegisteredTriggerActionJobs,
   registerTriggerActionJob,
-} from '@zanix/database'
+} from '@zanix/datamaster/database'
 import { registerJob } from '@zanix/asyncmq/jobs'
 
 type RequestJobArgs = Pick<

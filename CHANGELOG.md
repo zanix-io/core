@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-08-26
+
+### Fixed
+
+- **The root `.` and `./bootstrap` entry points no longer materialize `amqplib`, `graphql`, or
+  `redis` for a consumer that never uses the features that need them.** Three causes:
+  - `@zanix/app`/`@zanix/app/runtime`'s pin floor moves from `^0.2.0` to `^0.2.1` —
+    `@zanix/app@0.2.0` pinned a pre-split `@zanix/server` that bundled `graphql`/`amqplib`
+    unconditionally into its webserver/discovery machinery; `0.2.1` doesn't.
+  - `defineCoreMetadata` (`utils/metadata.ts`) resolved `@zanix/datamaster/core`/`@zanix/auth/core`/
+    `@zanix/notifications/core`/`@zanix/asyncmq/core` via literal `import()` calls — Deno's static
+    module graph follows a literal dynamic `import()` the same as a static one, so all four
+    materialized merely by importing `.`/`./bootstrap`. Routed through non-literal specifiers
+    (`modules/lazy/specifiers.ts`), matching this file's existing `ADMIN_SPECIFIER`/
+    `DATAMASTER_STORAGE_SPECIFIER` pattern. `@zanix/asyncmq/core`'s own pin also moves from the
+    stale `^0.7.0` to `^0.8.0`, matching `/jobs`/`/worker`.
+  - `modules/jobs/triggers.ts`/`setup.ts`'s combined `@zanix/database` alias (pointed at the bare
+    `@zanix/datamaster` root) splits into `@zanix/datamaster/database` and `@zanix/datamaster/dlq` —
+    the two subpaths that actually define the symbols each file uses.
+- **`Zanix.setup({ assets })`'s dependencies no longer materialize for every consumer.**
+  `modules/setup.ts` used to unconditionally import `@zanix/space/assets-api` (→ `sharp`/`svgo`),
+  `@zanix/datamaster/storage` (→ `@aws-sdk/client-s3`), and `@zanix/datamaster/files` (→ `mongoose`)
+  — reachable the moment `mod.ts` builds the `Zanix` class, regardless of whether `assets` was ever
+  configured. All three now resolve lazily via `@zanix/helpers`'s
+  `lazyFunction`/`lazyClass`/`lazyValue` (see `modules/lazy-specifiers.ts`) and are gone from
+  `deno.jsonc`'s `imports` map.
+- **`notifications.templatesBackend`/`templatesModel` (`Zanix.setup()`) and `codeTemplatesDiscovery`
+  (`Zanix.start()`/`bootstrap()`) no longer force-resolve `@zanix/notifications`'s bare root for a
+  caller that never sets either** — same lazy-resolution fix as `assets`, above.
+  `defineCoreMetadata()` still unconditionally loads `@zanix/notifications/core` as part of its own
+  always-on zero-config wiring sweep (alongside the other three `/core` subpaths above); this fix
+  narrows `setup`/`start`'s own options only.
+
+### Changed (breaking)
+
+- **`Zanix.setup()` is now `async`, returning `Promise<void>`** — `assets`'s lazy resolution (above)
+  always goes through a real `await`. A caller that never passes `assets` sees identical
+  synchronous-completion behavior; a caller that does must `await Zanix.setup(...)` before calling
+  `Zanix.getAssetsService()`.
+- **`Zanix.getAssetsService()` now returns `unknown` instead of `AssetService`** — the real type
+  lives in `@zanix/space/assets-api`, whose own file unconditionally imports the real
+  `AssetTransformer` (and so `sharp`/`svgo`); even `import type` would have re-materialized it for
+  every consumer. Cast at the point you already import `@zanix/space/assets-api` for real:
+
+  ```typescript
+  import type { AssetService } from '@zanix/space/assets-api'
+
+  defineSpaceApp({ assetsApi: { service: Zanix.getAssetsService() as AssetService } })
+  ```
+- **`mod.ts` no longer re-exports `AssetKind`/`AssetRecord`/`AssetService`/`AssetStatus`/
+  `AssetTransformRequest`/`AssetVariant`/`AssetVariantBase`/`AudioAssetVariant`/
+  `CreateAssetCommand`/`ImageAssetVariant`/`ThumbnailAssetVariant`/`UploadedAsset`/
+  `VideoAssetVariant`/`VideoBreakpointName`/`VoiceAudioFormat`/`VoiceAudioTransformOptions`** —
+  these existed only to type `Zanix.getAssetsService()`'s old return value (above). Import them
+  directly from `@zanix/space/assets-api` instead.
+
 ## [2.0.0] - 2026-08-24
 
 ### Added

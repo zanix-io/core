@@ -1,15 +1,7 @@
 // deno-coverage-ignore-file
 
-import {
-  Controller,
-  Get,
-  Query,
-  Resolver,
-  Socket,
-  ZanixController,
-  ZanixResolver,
-  ZanixWebSocket,
-} from '@zanix/server'
+import { Controller, Get, Socket, ZanixController, ZanixWebSocket } from '@zanix/server'
+import { Query, Resolver, ZanixResolver } from '@zanix/server/graphql'
 
 /** Sockets */
 @Socket({ route: 'socket' })

@@ -1,5 +1,5 @@
 import { assertEquals } from '@std/assert'
-import { DEFAULT_TRIGGER_JOBS, getRegisteredTriggerActionJobs } from '@zanix/database'
+import { DEFAULT_TRIGGER_JOBS, getRegisteredTriggerActionJobs } from '@zanix/datamaster/database'
 import { registerPendingTriggerActionJobs } from 'modules/jobs/triggers.ts'
 
 // Real registry lookup (no mocking `registerPendingTriggerActionJobs`/`getRegisteredTriggerActionJobs`

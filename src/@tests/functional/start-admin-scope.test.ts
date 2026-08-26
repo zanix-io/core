@@ -1,13 +1,7 @@
 import { assertEquals } from '@std/assert'
 import { stub } from '@std/testing/mock'
-import {
-  ProgramModule,
-  Query,
-  Resolver,
-  Socket,
-  ZanixResolver,
-  ZanixWebSocket,
-} from '@zanix/server'
+import { ProgramModule, Socket, ZanixWebSocket } from '@zanix/server'
+import { Query, Resolver, ZanixResolver } from '@zanix/server/graphql'
 import Zanix from '../../../mod.ts'
 
 /**

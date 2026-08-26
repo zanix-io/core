@@ -1,7 +1,7 @@
 import type { ComposeOptions, SetupOptions } from 'typings/setup.ts'
-import type { BootstrapServerOptions, WebServerTypes } from '@zanix/server'
+import type { BootstrapServerOptions, MiddlewareGuard, WebServerTypes } from '@zanix/server'
 import type { ActivatedApps } from '@zanix/app/runtime'
-import type { BehaviorOverride, ResourceBinding } from '@zanix/app'
+import type { BehaviorOverride, ResourceBinding, ZanixAppDefinition } from '@zanix/app'
 
 import { activateApps, bootstrapAppServer, deactivateApps } from '@zanix/app/runtime'
 import { defineCoreMetadata, defineLocalMetadata, registerWorkerTaskerUrl } from 'utils/metadata.ts'
@@ -18,12 +18,47 @@ import {
   type ServerID,
   webServerManager,
 } from '@zanix/server'
-import { defineCodeTemplatesDiscovery } from '@zanix/notifications'
-import {
-  createTemplatesDiscoveryGuard,
-  defineLocalAdminApp,
-  getLocalAdminSubApps,
-} from '@zanix/admin'
+import { lazyFunction } from '@zanix/helpers'
+import { ADMIN_SPECIFIER, NOTIFICATIONS_SPECIFIER } from './lazy/specifiers.ts'
+
+// `defineCodeTemplatesDiscovery` lives in `@zanix/notifications`'s own root entry file, the same
+// one `TemplateProvider` reaches (Handlebars + every template's own Zod schema) unconditionally —
+// see `lazy-specifiers.ts`'s own doc. Resolved lazily so a caller that never sets
+// `options.codeTemplatesDiscovery` (the only place this is invoked, below) never resolves it.
+type DefineCodeTemplatesDiscoveryFn = (options?: { guards?: MiddlewareGuard[] }) => void
+const defineCodeTemplatesDiscovery = lazyFunction<DefineCodeTemplatesDiscoveryFn>(
+  NOTIFICATIONS_SPECIFIER,
+  'defineCodeTemplatesDiscovery',
+)
+
+// `createTemplatesDiscoveryGuard`/`defineLocalAdminApp`/`getLocalAdminSubApps` live in
+// `@zanix/admin`'s own bare root, the same barrel that bundles `TemplatesAdminRepository`/
+// `TemplatesAdminService` (reaching `@zanix/notifications`'s bare root, and transitively
+// Handlebars, unconditionally) and `TriggersAdminRepository`/`TriggersAdminService` (reaching
+// `@zanix/database`, and transitively `mongoose`/`redis`) — see `lazy-specifiers.ts`'s own doc.
+// Resolved lazily so a caller that never sets `options.admin`/`options.codeTemplatesDiscovery` (the
+// only places these are invoked, below) never resolves `@zanix/admin`'s bare root at all. Plain
+// functions returning plain data (a `MiddlewareGuard`, a `ZanixAppDefinition`/`ZanixAppDefinition[]`)
+// — no decorator-registration timing constraint like `@zanix/server/graphql`'s own
+// `getMainHandler` case, which must run synchronously at decorator-evaluation time and so can't be
+// deferred behind a plain lazy-function wrap: `compose`/`start` are already `async`, and nothing
+// here needs to run synchronously inside the current module's own top-level scope, so a plain
+// `lazyFunction` wrap (rather than a self-registration slot) is the right technique.
+type CreateTemplatesDiscoveryGuardFn = () => MiddlewareGuard
+const createTemplatesDiscoveryGuard = lazyFunction<CreateTemplatesDiscoveryGuardFn>(
+  ADMIN_SPECIFIER,
+  'createTemplatesDiscoveryGuard',
+)
+type DefineLocalAdminAppFn = () => ZanixAppDefinition
+const defineLocalAdminApp = lazyFunction<DefineLocalAdminAppFn>(
+  ADMIN_SPECIFIER,
+  'defineLocalAdminApp',
+)
+type GetLocalAdminSubAppsFn = () => ZanixAppDefinition[]
+const getLocalAdminSubApps = lazyFunction<GetLocalAdminSubAppsFn>(
+  ADMIN_SPECIFIER,
+  'getLocalAdminSubApps',
+)
 
 /** The Application `options.admin` composes its embedded controllers under — see `start()`'s own doc. */
 const ADMIN_APPLICATION = 'admin'
@@ -156,7 +191,7 @@ export const compose: (
   )
 
   if (options.admin) {
-    await activateApps([defineLocalAdminApp(), ...getLocalAdminSubApps()])
+    await activateApps([await defineLocalAdminApp(), ...(await getLocalAdminSubApps())])
   }
 }
 
@@ -252,9 +287,9 @@ export const start: (options?: SetupOptions) => Promise<void> = async (
           : {}
         const application = config.application ??
           (adminEnabled ? ADMIN_APPLICATION : DEFAULT_APPLICATION)
-        const guards = config.guards ?? [createTemplatesDiscoveryGuard()]
-        await ProgramModule.defineApplication(application, () => {
-          defineCodeTemplatesDiscovery({ guards })
+        const guards = config.guards ?? [await createTemplatesDiscoveryGuard()]
+        await ProgramModule.defineApplication(application, async () => {
+          await defineCodeTemplatesDiscovery({ guards })
         })
       }
 
@@ -319,9 +354,9 @@ export const start: (options?: SetupOptions) => Promise<void> = async (
       // physically-separate operations/mcp sub-apps — see that package's own `local-admin-app.ts`
       // doc) activates alongside it in the SAME `activateApps` call, so a future sub-app sharing a
       // root resource with `defineLocalAdminApp` still resolves to the same instance.
-      const localAdminSubApps = adminEnabled ? getLocalAdminSubApps() : []
+      const localAdminSubApps = adminEnabled ? await getLocalAdminSubApps() : []
       if (adminEnabled) {
-        defs.unshift(defineLocalAdminApp(), ...localAdminSubApps)
+        defs.unshift(await defineLocalAdminApp(), ...localAdminSubApps)
       }
 
       if (defs.length) {

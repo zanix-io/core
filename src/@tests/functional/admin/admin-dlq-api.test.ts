@@ -1,7 +1,7 @@
 import { assert, assertEquals } from '@std/assert'
 import { stub } from '@std/testing/mock'
 import { webServerManager } from '@zanix/server'
-import { DLQ_MODEL_ENV } from '@zanix/database'
+import { DLQ_MODEL_ENV } from '@zanix/datamaster/dlq'
 import Zanix from '../../../../mod.ts'
 
 stub(console, 'info')

@@ -1,6 +1,9 @@
-import { assert, assertEquals, assertExists, assertThrows } from '@std/assert'
+import { assert, assertEquals, assertExists, assertRejects } from '@std/assert'
 import { getAssetsService, setup } from 'modules/setup.ts'
 import { HttpError, InternalError, serializeError, setDefaultRedactOptions } from '@zanix/errors'
+// Real type, resolved only for this test file via `deno.jsonc`'s own `scopes` entry — see that
+// file's own doc for why `@zanix/core`'s published surface never imports this directly.
+import type { AssetService } from '@zanix/space/assets-api'
 
 console.error = () => {}
 
@@ -25,10 +28,10 @@ const SET_ENVS = [
   'FILE_MODEL_NAME',
 ]
 
-function envTest(name: string, fn: () => void): void {
-  Deno.test(name, () => {
+function envTest(name: string, fn: () => void | Promise<void>): void {
+  Deno.test(name, async () => {
     try {
-      fn()
+      await fn()
     } finally {
       for (const env of [...ELASTIC_ENVS, ...SET_ENVS]) Deno.env.delete(env)
     }
@@ -43,9 +46,9 @@ function globalLogger(): any {
 
 envTest(
   'setup(): does nothing observable when called with no options and no env vars',
-  () => {
+  async () => {
     const before = globalLogger()
-    setup()
+    await setup()
     assertEquals(globalLogger(), before)
     for (const env of SET_ENVS) assertEquals(Deno.env.get(env), undefined)
   },
@@ -53,21 +56,21 @@ envTest(
 
 envTest(
   'setup(): constructs ErrorLogThrottle without throwing when given explicit options',
-  () => {
-    setup({ errors: { logThrottle: { threshold: 5, windowMs: 1000 } } })
+  async () => {
+    await setup({ errors: { logThrottle: { threshold: 5, windowMs: 1000 } } })
   },
 )
 
 envTest(
   'setup(): constructs UncaughtErrorMonitor without throwing when given explicit options',
-  () => {
-    setup({ errors: { uncaughtMonitor: { threshold: 5, windowMs: 1000 } } })
+  async () => {
+    await setup({ errors: { uncaughtMonitor: { threshold: 5, windowMs: 1000 } } })
   },
 )
 
-envTest('setup(): logger.elastic true installs a new global logger', () => {
+envTest('setup(): logger.elastic true installs a new global logger', async () => {
   const before = globalLogger()
-  setup({ logger: { elastic: true } })
+  await setup({ logger: { elastic: true } })
   assert(
     globalLogger() !== before,
     'expected a new global logger instance to be installed',
@@ -76,9 +79,9 @@ envTest('setup(): logger.elastic true installs a new global logger', () => {
 
 envTest(
   'setup(): logger.elastic as an options object installs a new global logger',
-  () => {
+  async () => {
     const before = globalLogger()
-    setup({ logger: { elastic: { node: 'http://localhost:9200' } } })
+    await setup({ logger: { elastic: { node: 'http://localhost:9200' } } })
     assert(
       globalLogger() !== before,
       'expected a new global logger instance to be installed',
@@ -88,11 +91,11 @@ envTest(
 
 envTest(
   'setup(): SEARCH_ENGINE=elasticsearch alone (no explicit option) installs a new global logger',
-  () => {
+  async () => {
     Deno.env.set('SEARCH_ENGINE', 'elasticsearch')
     Deno.env.set('SEARCH_URL', 'http://localhost:9200')
     const before = globalLogger()
-    setup()
+    await setup()
     assert(
       globalLogger() !== before,
       'expected a new global logger instance to be installed',
@@ -102,11 +105,11 @@ envTest(
 
 envTest(
   'setup(): SEARCH_ENGINE=opensearch alone (no explicit option) installs a new global logger',
-  () => {
+  async () => {
     Deno.env.set('SEARCH_ENGINE', 'opensearch')
     Deno.env.set('SEARCH_URL', 'http://localhost:9200')
     const before = globalLogger()
-    setup()
+    await setup()
     assert(
       globalLogger() !== before,
       'expected a new global logger instance to be installed',
@@ -116,11 +119,11 @@ envTest(
 
 envTest(
   'setup(): SEARCH_ENGINE=meilisearch alone never auto-enables Elasticsearch-backed logging',
-  () => {
+  async () => {
     Deno.env.set('SEARCH_ENGINE', 'meilisearch')
     Deno.env.set('SEARCH_URL', 'http://localhost:7700')
     const before = globalLogger()
-    setup()
+    await setup()
     assertEquals(
       globalLogger(),
       before,
@@ -131,35 +134,35 @@ envTest(
 
 envTest(
   'setup(): logger.elastic false skips even when SEARCH_ENGINE=elasticsearch is set',
-  () => {
+  async () => {
     Deno.env.set('SEARCH_ENGINE', 'elasticsearch')
     Deno.env.set('SEARCH_URL', 'http://localhost:9200')
     const before = globalLogger()
-    setup({ logger: { elastic: false } })
+    await setup({ logger: { elastic: false } })
     assertEquals(globalLogger(), before)
   },
 )
 
 envTest(
-  'setup(): an invalid SEARCH_ENGINE value throws even with no explicit logger option',
-  () => {
+  'setup(): an invalid SEARCH_ENGINE value rejects even with no explicit logger option',
+  async () => {
     Deno.env.set('SEARCH_ENGINE', 'solr')
-    assertThrows(() => setup(), InternalError)
+    await assertRejects(() => setup(), InternalError)
   },
 )
 
 envTest(
   'setup(): logger.disableGlobalAssign alone still constructs a Logger',
-  () => {
-    setup({ logger: { disableGlobalAssign: true } })
+  async () => {
+    await setup({ logger: { disableGlobalAssign: true } })
   },
 )
 
 envTest(
   'setup(): logger.formatter alone (no elastic) still constructs a Logger',
-  () => {
+  async () => {
     const before = globalLogger()
-    setup({ logger: { formatter: (level, data) => ({ level, data }) } })
+    await setup({ logger: { formatter: (level, data) => ({ level, data }) } })
     assert(
       globalLogger() !== before,
       'expected a new global logger instance to be installed',
@@ -169,9 +172,9 @@ envTest(
 
 envTest(
   'setup(): elastic + a manually-provided formatter keeps the formatter',
-  () => {
+  async () => {
     const before = globalLogger()
-    setup({
+    await setup({
       logger: {
         elastic: true,
         formatter: (level, data) => ({ level, data }),
@@ -186,8 +189,8 @@ envTest(
 
 envTest(
   'setup(): database/notifications options set the expected env vars',
-  () => {
-    setup({
+  async () => {
+    await setup({
       database: {
         seeders: false,
         triggersModel: 'custom-triggers',
@@ -213,8 +216,8 @@ envTest(
 
 envTest(
   'setup(): unset database/notifications fields leave their env vars untouched',
-  () => {
-    setup({ database: { seeders: true } })
+  async () => {
+    await setup({ database: { seeders: true } })
 
     assertEquals(Deno.env.get('DATABASE_SEEDERS'), 'true')
     assertEquals(Deno.env.get('TRIGGERS_MODEL_NAME'), undefined)
@@ -222,8 +225,8 @@ envTest(
   },
 )
 
-envTest('setup(): dlq options set the expected env vars', () => {
-  setup({
+envTest('setup(): dlq options set the expected env vars', async () => {
+  await setup({
     dlq: {
       modelName: 'custom-dlq',
       encryptPayload: true,
@@ -236,8 +239,8 @@ envTest('setup(): dlq options set the expected env vars', () => {
   assertEquals(Deno.env.get('DLQ_DEFAULT_LEASE_MS'), '15000')
 })
 
-envTest('setup(): unset dlq fields leave their env vars untouched', () => {
-  setup({ dlq: { modelName: 'custom-dlq' } })
+envTest('setup(): unset dlq fields leave their env vars untouched', async () => {
+  await setup({ dlq: { modelName: 'custom-dlq' } })
 
   assertEquals(Deno.env.get('DLQ_MODEL_NAME'), 'custom-dlq')
   assertEquals(Deno.env.get('DLQ_ENCRYPT_PAYLOAD'), undefined)
@@ -246,7 +249,7 @@ envTest('setup(): unset dlq fields leave their env vars untouched', () => {
 
 envTest(
   'setup(): logger.redact.pattern registers globally too, not just for the Logger it constructs',
-  () => {
+  async () => {
     try {
       const error = new HttpError('BAD_GATEWAY', {
         meta: { 'my-internal-secret': 'hide-me' },
@@ -259,7 +262,7 @@ envTest(
         'my-internal-secret': 'hide-me',
       })
 
-      setup({ logger: { redact: { pattern: /^my-internal-secret$/i } } })
+      await setup({ logger: { redact: { pattern: /^my-internal-secret$/i } } })
 
       // Real bug this guards against: a custom pattern only reached the `Logger` instance's own
       // console/storage output, never `serializeError`'s own default — meaning the same
@@ -276,7 +279,7 @@ envTest(
 
 envTest(
   "setup(): logger.redact:false also registers globally, disabling serializeError's own default",
-  () => {
+  async () => {
     try {
       const error = new HttpError('BAD_GATEWAY', {
         meta: { 'my-internal-secret': 'hide-me' },
@@ -289,7 +292,7 @@ envTest(
         { 'my-internal-secret': 'hide-me' },
       )
 
-      setup({ logger: { redact: false } })
+      await setup({ logger: { redact: false } })
 
       // Real bug this guards against: `redact: false` only disabled the `Logger` instance's own
       // redaction — `serializeError`'s own default (no `redact` passed, exactly
@@ -310,14 +313,14 @@ envTest(
 
 envTest(
   'setup(): an already-set env var always wins over a ConfigOptions value',
-  () => {
+  async () => {
     Deno.env.set('DATABASE_SEEDERS', 'true')
     Deno.env.set('TRIGGERS_MODEL_NAME', 'from-real-environment')
     Deno.env.set('TEMPLATES_BACKEND', 'remote')
     Deno.env.set('TEMPLATES_MODEL_NAME', '')
     Deno.env.set('DLQ_MODEL_NAME', 'from-real-environment')
 
-    setup({
+    await setup({
       notifications: { templatesBackend: 'local', templatesModel: 'model' },
       database: { seeders: false, triggersModel: 'hardcoded-value' },
       dlq: { modelName: 'hardcoded-dlq-name' },
@@ -337,10 +340,14 @@ envTest(
 // are both safe to construct with zero real network/Mongo connection (confirmed: `S3ObjectStorage`
 // builds its own `S3Client` lazily; `MongoFileRepository`'s `database` is a lazy getter,
 // only resolved inside `.model()`, which nothing here ever calls) — so these tests need no real
-// S3-compatible/Mongo instance, same as every other `setup()` test in this file. ----------------
+// S3-compatible/Mongo instance, same as every other `setup()` test in this file. `await setup(...)`
+// is required here specifically (unlike the database/notifications/dlq tests above, which pass
+// synchronously either way): `assets` is the one option resolved through a real `await` internally
+// (see `setup.ts`'s own doc), so `getAssetsService()` only sees the constructed value once this
+// call has actually resolved. -----------------------------------------------------------------
 
-envTest('setup(): assets options set the expected env vars', () => {
-  setup({
+envTest('setup(): assets options set the expected env vars', async () => {
+  await setup({
     assets: {
       s3Endpoint: 'http://localhost:8333',
       s3AccessKey: 'access-key',
@@ -363,8 +370,8 @@ envTest('setup(): assets options set the expected env vars', () => {
 
 envTest(
   'setup(): unset assets fields leave their env vars untouched',
-  () => {
-    setup({ assets: { s3Bucket: 'only-this-one' } })
+  async () => {
+    await setup({ assets: { s3Bucket: 'only-this-one' } })
 
     assertEquals(Deno.env.get('S3_BUCKET'), 'only-this-one')
     assertEquals(Deno.env.get('S3_ENDPOINT'), undefined)
@@ -375,11 +382,11 @@ envTest(
 
 envTest(
   'setup(): an already-set S3/FILE env var always wins over a ConfigOptions value',
-  () => {
+  async () => {
     Deno.env.set('S3_BUCKET', 'from-real-environment')
     Deno.env.set('FILE_MODEL_NAME', 'from-real-environment')
 
-    setup({ assets: { s3Bucket: 'hardcoded-value', filesModelName: 'hardcoded-value' } })
+    await setup({ assets: { s3Bucket: 'hardcoded-value', filesModelName: 'hardcoded-value' } })
 
     assertEquals(Deno.env.get('S3_BUCKET'), 'from-real-environment')
     assertEquals(Deno.env.get('FILE_MODEL_NAME'), 'from-real-environment')
@@ -388,10 +395,10 @@ envTest(
 
 envTest(
   'setup(): assets constructs a real AssetService and self-registers it, S3-only (no localDir)',
-  () => {
-    setup({ assets: { s3Bucket: 'test-bucket' } })
+  async () => {
+    await setup({ assets: { s3Bucket: 'test-bucket' } })
 
-    const service = getAssetsService()
+    const service = getAssetsService() as AssetService | undefined
     assertExists(
       service,
       'expected setup({ assets }) to construct and register a real AssetService',
@@ -404,8 +411,10 @@ envTest(
 
 envTest(
   'setup(): assets.localDir constructs an AssetService with local fallback/migration wired in',
-  () => {
-    setup({ assets: { s3Bucket: 'test-bucket', localDir: './zanix-core-test-assets-fallback' } })
+  async () => {
+    await setup({
+      assets: { s3Bucket: 'test-bucket', localDir: './zanix-core-test-assets-fallback' },
+    })
 
     const service = getAssetsService()
     assertExists(service, 'expected a real AssetService even with localDir configured')
@@ -414,12 +423,12 @@ envTest(
 
 envTest(
   'setup(): omitting assets entirely never touches the previously-registered AssetService',
-  () => {
-    setup({ assets: { s3Bucket: 'test-bucket' } })
+  async () => {
+    await setup({ assets: { s3Bucket: 'test-bucket' } })
     const before = getAssetsService()
     assertExists(before)
 
-    setup({ database: { seeders: true } })
+    await setup({ database: { seeders: true } })
 
     assertEquals(getAssetsService(), before, 'expected the singleton to be left untouched')
   },

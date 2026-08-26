@@ -230,12 +230,15 @@ See `ZanixAppBootstrapOptions`'s own JSDoc for the full shape.
 `Zanix.setup()` wires cross-cutting configuration that isn't part of the HTTP/worker bootstrap
 itself: error-log throttling, logger configuration (including Elasticsearch/OpenSearch-backed
 persistence), and non-secret `@zanix/datamaster`/`@zanix/notifications` config (including its
-`DLQProvider`) that would otherwise mean setting several env vars by hand.
+`DLQProvider`) that would otherwise mean setting several env vars by hand. It returns a `Promise`
+(`assets` — see below — is the one option resolved through a real `await` internally); every other
+option still completes synchronously, but `await` it regardless for a stable contract regardless of
+which options are passed.
 
 ```typescript
 import Zanix from 'jsr:@zanix/core@[version]'
 
-Zanix.setup({
+await Zanix.setup({
   errors: { logThrottle: { threshold: 100, windowMs: 10 * 60_000 } },
   logger: { elastic: true },
   database: { seeders: false, triggersModel: 'my-triggers' },
@@ -285,19 +288,28 @@ self-registers globally; `import logger from '@zanix/logger'` reads it back).
 `Zanix.setup({ assets })` builds `S3ObjectStorage` (+ an optional local fallback/migration, when
 `localDir` is given) and `MongoFileRepository` (adapted via `@zanix/space/assets-api`'s
 `createAssetRepositoryOverFiles`), wires them into a real `AssetService`, and registers it — read it
-back with `Zanix.getAssetsService()`:
+back with `Zanix.getAssetsService()`.
+
+`@zanix/space`/`@zanix/datamaster`'s Asset API dependencies (`sharp`/`svgo`, `@aws-sdk/client-s3`,
+`mongoose`) are resolved lazily, only when `assets` is actually passed — a service that never calls
+`Zanix.setup({ assets })` never pays for any of them merely by importing `@zanix/core`. This is why
+`Zanix.setup()` returns a `Promise`: `await` it before reading `Zanix.getAssetsService()`.
+`Zanix.getAssetsService()` itself returns `unknown`, not the real `AssetService`, for the same
+reason — recover the real type with a cast at the point you already import `@zanix/space/assets-api`
+for real:
 
 ```typescript
 import Zanix from 'jsr:@zanix/core@[version]'
 import { defineSpaceApp } from 'jsr:@zanix/space@[version]'
+import type { AssetService } from 'jsr:@zanix/space@[version]/assets-api'
 
-Zanix.setup({
+await Zanix.setup({
   assets: { s3Bucket: 'prod-assets', localDir: './local-assets' },
 })
 
 const app = defineSpaceApp({
   name: 'storefront',
-  assetsApi: { service: Zanix.getAssetsService()! },
+  assetsApi: { service: Zanix.getAssetsService() as AssetService },
 })
 
 await Zanix.start({ apps: { storefront: { definition: app, server: { ssr: {} } } } })
