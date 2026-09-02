@@ -52,7 +52,8 @@
     "npm:handlebars@^4.7.8": "4.7.9",
     "npm:mongoose@8": "8.24.4",
     "npm:redis@^5.9.0": "5.12.1",
-    "npm:sharp@~0.35.3": "0.35.4"
+    "npm:sharp@~0.35.3": "0.35.4",
+    "npm:zod@^4.1.13": "4.5.4"
   },
   "jsr": {
     "@db/sqlite@0.12.0": {
@@ -247,7 +248,8 @@
         "jsr:@zanix/datamaster@^1.9.0",
         "jsr:@zanix/server@4",
         "jsr:@zanix/utils@4",
-        "npm:handlebars"
+        "npm:handlebars",
+        "npm:zod"
       ]
     },
     "@zanix/server@4.2.0": {
@@ -918,6 +920,9 @@
     },
     "wordwrap@1.0.0": {
       "integrity": "sha512-gvVzJFlPycKc5dZN4yPkP8w7Dc37BtP1yczEneOb4uq34pXZcvrtRTmWV8W+Ume+XCxKgbjM+nevkyFPMybd4Q=="
+    },
+    "zod@4.5.4": {
+      "integrity": "sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA=="
     }
   },
   "workspace": {
