@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-09-01
+
+### Changed
+
+- **Dependency floors bumped to match already-published sibling versions** — no code behavior
+  change, purely widening the version ranges this package declares (`deno.jsonc`'s `imports` map)
+  and the lazy-loaded specifier strings that mirror them (`modules/lazy/specifiers.ts`):
+  - `@zanix/admin`/`@zanix/admin/hub`: `^2.1.0` → `^2.3.0`
+  - `@zanix/notifications` (root, `/templates-api`, `/core`): `^0.7.0` → `^1.0.0`
+  - `@zanix/datamaster` (`/database`, `/dlq`, `/triggers-api`, `/dlq-api`, `/observability`,
+    `/storage`, `/files`, `/core`): `^1.8.0` → `^1.9.0`
+  - `@zanix/auth/core` (lazy specifier only, not in `deno.jsonc`'s `imports`): `^0.8.1` → `^1.0.0`
+  - `@zanix/space/assets-api` (lazy specifier only, test-only `scopes` entry): `^0.2.0` → `^1.1.0`
+
 ## [3.0.0] - 2026-08-26
 
 ### Fixed

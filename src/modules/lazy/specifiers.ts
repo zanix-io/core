@@ -41,16 +41,16 @@
 
 /** `@zanix/space`'s `./assets-api` subpath — `createAssetService`/`createAssetRepositoryOverFiles`,
  * runtime, value-level use only. */
-export const SPACE_ASSETS_API_SPECIFIER = 'jsr:@zanix/space@^0.2.0/assets-api'
+export const SPACE_ASSETS_API_SPECIFIER = 'jsr:@zanix/space@^1.1.0/assets-api'
 
 /** `@zanix/datamaster`'s `./storage` subpath — `S3ObjectStorage`/`createFallbackObjectStorage`/
  * `createLocalFilesystemObjectStorage`/`ensureLocalObjectsSynced`/the `S3_*` env var name
  * constants. */
-export const DATAMASTER_STORAGE_SPECIFIER = 'jsr:@zanix/datamaster@^1.8.0/storage'
+export const DATAMASTER_STORAGE_SPECIFIER = 'jsr:@zanix/datamaster@^1.9.0/storage'
 
 /** `@zanix/datamaster`'s `./files` subpath — `MongoFileRepository`/`registerFileModel`/
  * `FILE_MODEL_ENV`. */
-export const DATAMASTER_FILES_SPECIFIER = 'jsr:@zanix/datamaster@^1.8.0/files'
+export const DATAMASTER_FILES_SPECIFIER = 'jsr:@zanix/datamaster@^1.9.0/files'
 
 /** `@zanix/notifications`'s bare root — `TEMPLATES_BACKEND_ENV`/`TEMPLATES_MODEL_ENV` (used by
  * `setup.ts`) and `defineCodeTemplatesDiscovery` (used by `start.ts`, already gated behind
@@ -59,7 +59,7 @@ export const DATAMASTER_FILES_SPECIFIER = 'jsr:@zanix/datamaster@^1.8.0/files'
  * Handlebars/Zod-backed template registries — so this points at the same already-published root
  * `core`'s own `deno.jsonc` used to import statically; only HOW it's resolved changes, from an
  * eager static import to a gated, lazy one. */
-export const NOTIFICATIONS_SPECIFIER = 'jsr:@zanix/notifications@^0.7.0'
+export const NOTIFICATIONS_SPECIFIER = 'jsr:@zanix/notifications@^1.0.0'
 
 /** `@zanix/datamaster`'s `./core` subpath — zero-config Mongo/Redis connector registration,
  * side-effect only (no export this package reads by name). Used by `defineCoreMetadata`
@@ -68,17 +68,17 @@ export const NOTIFICATIONS_SPECIFIER = 'jsr:@zanix/notifications@^0.7.0'
  * `redis`) merely by importing the module that DEFINES `defineCoreMetadata`, for a consumer that
  * never actually calls `start()`/`startWorker()` at all (e.g. one that only imports `.`/
  * `./bootstrap` to read a type). */
-export const DATAMASTER_CORE_SPECIFIER = 'jsr:@zanix/datamaster@^1.8.0/core'
+export const DATAMASTER_CORE_SPECIFIER = 'jsr:@zanix/datamaster@^1.9.0/core'
 
 /** `@zanix/auth`'s `./core` subpath — zero-config session/auth connector registration,
  * side-effect only (no export this package reads by name). Same reasoning as
  * `DATAMASTER_CORE_SPECIFIER` above. */
-export const AUTH_CORE_SPECIFIER = 'jsr:@zanix/auth@^0.8.1/core'
+export const AUTH_CORE_SPECIFIER = 'jsr:@zanix/auth@^1.0.0/core'
 
 /** `@zanix/notifications`'s `./core` subpath — zero-config Mongo/`TemplateProvider` registration,
  * side-effect only (no export this package reads by name). Same reasoning as
  * `DATAMASTER_CORE_SPECIFIER` above. */
-export const NOTIFICATIONS_CORE_SPECIFIER = 'jsr:@zanix/notifications@^0.7.0/core'
+export const NOTIFICATIONS_CORE_SPECIFIER = 'jsr:@zanix/notifications@^1.0.0/core'
 
 /** `@zanix/asyncmq`'s `./core` subpath — zero-config RabbitMQ connector/worker-provider
  * registration, side-effect only (no export this package reads by name). Same reasoning as
@@ -95,4 +95,4 @@ export const ASYNCMQ_CORE_SPECIFIER = 'jsr:@zanix/asyncmq@^0.8.0/core'
  * `@zanix/core` consumer regardless of whether `admin`/`codeTemplatesDiscovery` is ever configured.
  * `@zanix/admin`'s own `/hub` subpath doesn't help here — it exposes only `ZanixAdminHub`, not
  * these three functions, which have no narrower subpath of their own today. */
-export const ADMIN_SPECIFIER = 'jsr:@zanix/admin@^2.1.0'
+export const ADMIN_SPECIFIER = 'jsr:@zanix/admin@^2.3.0'
