@@ -1,6 +1,6 @@
 {
   "name": "@zanix/core",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "nodeModulesDir": "auto",
   "zanix": {
     "project": "library"
@@ -63,8 +63,8 @@
     // version directly (`0.2.0` still resolves `amqplib`/`graphql`/`mongoose`/`redis` from
     // `/runtime` alone; `0.2.1` resolves none of them). `^0.2.1` still accepts a future `0.2.x`
     // patch release, it just excludes the one specific version with the bug.
-    "@zanix/app": "jsr:@zanix/app@^0.2.1",
-    "@zanix/app/runtime": "jsr:@zanix/app@^0.2.1/runtime",
+    "@zanix/app": "jsr:@zanix/app@^1.0.0",
+    "@zanix/app/runtime": "jsr:@zanix/app@^1.0.0/runtime",
     "@zanix/server": "jsr:@zanix/server@^4.0.0",
     "@zanix/server/graphql": "jsr:@zanix/server@^4.0.0/graphql",
     // Deliberately absent: `@zanix/asyncmq/core`/`@zanix/notifications/core`/`@zanix/datamaster/core`/
