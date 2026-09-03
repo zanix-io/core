@@ -1,6 +1,6 @@
 {
   "name": "@zanix/core",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "nodeModulesDir": "auto",
   "zanix": {
     "project": "library"
@@ -102,6 +102,7 @@
       "@zanix/space/assets-api": "jsr:@zanix/space@^1.1.0/assets-api",
       "@zanix/datamaster/storage": "jsr:@zanix/datamaster@^1.9.0/storage",
       "@zanix/datamaster/files": "jsr:@zanix/datamaster@^1.9.0/files",
+      "@zanix/datamaster/cache": "jsr:@zanix/datamaster@^1.9.0/cache",
       "@zanix/notifications": "jsr:@zanix/notifications@^1.0.0"
     }
   },

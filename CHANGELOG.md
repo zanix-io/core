@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-09-02
+
+### Added
+
+- **`SetupOptions.dispatcher` and `ZanixAppBootstrapOptions.remoteInstances`** — lets an app
+  composed via `Zanix.start()`'s `apps` option reach, and be reached by, a genuinely different
+  process over `ctx.remote()`, the same story `bootstrapRemoteApp` already gave a standalone Zanix
+  App. An `apps` entry that sets its own `remoteInstances` is announced to the Control Plane
+  Registry right after its own local `onStart` completes, folded into the same `activateApps()`
+  batch as every other named `apps` entry. `SetupOptions.dispatcher` overrides how every app in that
+  batch reaches a target not running in this same process (auto-detected otherwise via the
+  `'controlPlane'` core-provider slot). See the README's new "Cross-app calls" section.
+
 ## [3.0.1] - 2026-09-01
 
 ### Changed

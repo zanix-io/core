@@ -1,6 +1,6 @@
 import type { ComposeOptions, SetupOptions } from 'typings/setup.ts'
 import type { BootstrapServerOptions, MiddlewareGuard, WebServerTypes } from '@zanix/server'
-import type { ActivatedApps } from '@zanix/app/runtime'
+import type { ActivatedApps, RemoteInstanceOptions } from '@zanix/app/runtime'
 import type { BehaviorOverride, ResourceBinding, ZanixAppDefinition } from '@zanix/app'
 
 import { activateApps, bootstrapAppServer, deactivateApps } from '@zanix/app/runtime'
@@ -228,6 +228,13 @@ export const compose: (
  * `server`/`rootDir`, the admin server via the top-level `admin` — using either as an `apps` key
  * throws immediately.
  *
+ * An `apps` entry that also sets its own `remoteInstances` (see `ZanixAppBootstrapOptions`) is
+ * announced to the Control Plane Registry as part of that same `activateApps()` batch, right after
+ * its own local `onStart` completes — the same mechanism `bootstrapRemoteApp` already gives a
+ * standalone Zanix App, now reachable for one embedded here too. `options.dispatcher` overrides how
+ * every app in this batch reaches a target NOT running in this same process (auto-detected
+ * otherwise) — see `SetupOptions`'s own doc for both.
+ *
  * See `docs/admin-apis.md` for the full `admin` option shape (boolean vs. explicit per-type
  * config), the zero-config `PORT`/`PORT_<TYPE>` shared-listener story for single-port platforms
  * (Heroku, Render, etc.), and how this coexists in the same process with `ZanixAdminHub.start()`
@@ -347,6 +354,15 @@ export const start: (options?: SetupOptions) => Promise<void> = async (
           implementation,
         }))
       )
+      // See `ZanixAppBootstrapOptions.remoteInstances`'s own doc — only an entry that actually set
+      // it is included, same reasoning `bootstrapRemoteApp` (`@zanix/app/runtime`) already follows
+      // for its own single-app equivalent: an app never listed here is never announced, regardless
+      // of what its manifest's own `runtime.mode` suggests.
+      const remoteInstances: Record<string, RemoteInstanceOptions> = Object.fromEntries(
+        zanixApps
+          .filter(([, { remoteInstances }]) => remoteInstances)
+          .map(([name, { remoteInstances }]) => [name, remoteInstances as RemoteInstanceOptions]),
+      )
 
       // `admin` composes first (matching this sequence's own historical ordering — admin served
       // before any named app), via `@zanix/admin`'s own Zanix App manifest, never a bespoke
@@ -364,8 +380,8 @@ export const start: (options?: SetupOptions) => Promise<void> = async (
           defs,
           options.resources ?? {},
           bindings,
-          undefined,
-          undefined,
+          options.dispatcher,
+          remoteInstances,
           behaviorOverrides,
         )
 

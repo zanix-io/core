@@ -188,9 +188,9 @@ actually want them on one listener.
 ### Named apps: shared resources and behavior overrides
 
 Every entry under `apps` is a `defineZanixApp()` manifest (`ZanixAppBootstrapOptions` —
-`{ definition, server?, uses?, behaviors? }`). All named apps (plus `admin`, when enabled) resolve
-together as one batch, so two apps that declare a dependency on the same root resource share a
-single instance instead of each constructing their own:
+`{ definition, server?, uses?, behaviors?, remoteInstances? }`). All named apps (plus `admin`, when
+enabled) resolve together as one batch, so two apps that declare a dependency on the same root
+resource share a single instance instead of each constructing their own:
 
 ```typescript
 await Zanix.start({
@@ -224,6 +224,64 @@ await Zanix.start({
 An entry with no `server` still registers (mount, jobs, resources, `setup`/`onStart`/`onStop`) but
 is never served over HTTP — useful for an app that only needs background jobs or shared resources.
 See `ZanixAppBootstrapOptions`'s own JSDoc for the full shape.
+
+### Cross-app calls: `ctx.remote()` and the Control Plane
+
+Two separate services can talk to each other over `ctx.remote()` without either one bypassing
+`Zanix.start()` — `apps.<name>.remoteInstances` announces an app to the Control Plane Registry so a
+genuinely different process can reach it, and `SetupOptions.dispatcher` lets this process reach that
+kind of target. `ctx.remote()` itself resolves local-first, zero network, whenever the target
+happens to run in the same process — the two options below only matter once the caller and the
+target are two separate deployments.
+
+**Service A** exposes an operation and announces itself:
+
+```typescript
+// billing-service/mod.ts
+import Zanix from '@zanix/core'
+import '@zanix/app/core' // wires the 'controlPlane' provider the Registry/Config Plane need
+import billingApp from './billing.app.ts' // defineZanixApp({ name: 'billing', operations: {...} })
+
+await Zanix.start({
+  apps: {
+    billing: {
+      definition: billingApp,
+      server: { rest: { port: 8080 } },
+      // Registers 'billing' in the Control Plane Registry right after its own onStart
+      // completes — omit this and the app stays reachable only from apps in this SAME process.
+      remoteInstances: { endpoint: 'http://billing-service.internal:8080' },
+    },
+  },
+})
+```
+
+**Service B** calls it — no `remoteInstances` needed on this side, since it never gets called into,
+only out of; importing `@zanix/app/core` here too is what lets `ctx.remote()`'s HTTP fallback
+resolve `billing`'s live endpoint from the same Registry:
+
+```typescript
+// invoicing-service/mod.ts
+import Zanix from '@zanix/core'
+import '@zanix/app/core'
+import invoicingApp from './invoicing.app.ts'
+
+await Zanix.start({ apps: { invoicing: { definition: invoicingApp } } })
+```
+
+```typescript
+// invoicing.app.ts — inside an operations handler, setup(ctx), onStart, etc.
+const result = await ctx.remote('billing').call(
+  'chargeInvoice',
+  { orderId },
+  { timeoutMs: 3000 },
+)
+```
+
+`SetupOptions.dispatcher` is only needed to override the auto-detected transport — e.g. an
+`HttpRemoteAdapter` configured with mTLS certificates, or a custom `HttpRemoteDispatcher`
+implementation — a manual `dispatcher` always wins over the auto-detected one. See `@zanix/app`'s
+own README ("Cross-app calls") for `allowedCallers`, Remote Resource Binding, and the full Control
+Plane/mTLS picture.
 
 ### General configuration (`Zanix.setup()`)
 

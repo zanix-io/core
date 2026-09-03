@@ -5,7 +5,11 @@ import type {
   WebServerTypes,
 } from '@zanix/server'
 import type { ResourceBinding, RootResources, ZanixAppDefinition } from '@zanix/app'
-import type { ZanixAppServerOptions } from '@zanix/app/runtime'
+import type {
+  HttpRemoteDispatcher,
+  RemoteInstanceOptions,
+  ZanixAppServerOptions,
+} from '@zanix/app/runtime'
 
 /**
  * Per-type config accepted by `SetupOptions.admin` — identical to `BootstrapServerOptions[K]`
@@ -66,6 +70,20 @@ export interface ZanixAppBootstrapOptions {
    * (which names an ALTERNATIVE RESOURCE to resolve), the replacement implementation is given
    * directly — there's no construction step to defer. */
   behaviors?: Record<string, (...args: never[]) => unknown>
+  /** Announces this app to the Control Plane Registry once its own local `onStart` completes, so
+   * another Zanix App (in this same process or a genuinely different one) can reach it via
+   * `ctx.remote('${this app's name}')` — see `@zanix/app/runtime`'s `RemoteInstanceOptions`. Same
+   * shape and behavior `bootstrapRemoteApp`'s own `remoteInstances` option already gives a
+   * standalone app; this is the equivalent for an app embedded via `Zanix.start()`'s `apps`
+   * option, which previously had no way to reach the Control Plane at all — `start()` folds every
+   * entry that sets this into ONE `activateApps()` call alongside every other named `apps` entry,
+   * same batching `uses`/`behaviors` already get.
+   *
+   * **Presence of this field IS the decision** to run this app in `remote` mode for THIS process —
+   * the manifest's own `runtime.mode` is only ever the author's default suggestion, never enforced
+   * by itself (see `RemoteInstanceOptions`'s own doc). Omit to keep this app local-only for this
+   * process, even if its own manifest declares `runtime: { mode: 'remote' }`. */
+  remoteInstances?: RemoteInstanceOptions
 }
 
 /**
@@ -150,6 +168,16 @@ export type CodeTemplatesDiscoveryOptions = {
  * @property {RootResources} [resources] - Root-level resources (e.g. a shared `mongo`/`redis`
  * connector) that a Zanix App declared in `apps` can bind its own `dependencies` slots to, via
  * that entry's own `uses` (see `ZanixAppBootstrapOptions`).
+ * @property {HttpRemoteDispatcher} [dispatcher] - Overrides how `ctx.remote()` reaches a target
+ * app not running in this same process, for every app in `apps` at once (`@zanix/app/runtime`'s
+ * `activateApps`'s own 4th argument). Omitted (the default), this auto-detects the
+ * `'controlPlane'` core-provider slot (registered only if `@zanix/app/core` was imported) and uses
+ * a plain `HttpRemoteAdapter`; if that slot was never registered either, every `ctx.remote()` call
+ * resolves local-only. Pass an `HttpRemoteAdapter` constructed with `mtls` options (or your own
+ * `HttpRemoteDispatcher` implementation) only when the default auto-detected one isn't enough —
+ * this always wins over it regardless. Independent of `ZanixAppBootstrapOptions.remoteInstances`:
+ * that decides whether THIS process announces an app as reachable, this decides how THIS process
+ * reaches other apps.
  * @property {boolean | CodeTemplatesDiscoveryOptions} [codeTemplatesDiscovery] - Exposes this
  * process's own in-code notification templates (`@zanix/notifications`'s `CODE_TEMPLATES`) under
  * `/.well-known/zanix/code-templates`, via `defineCodeTemplatesDiscovery()`. **Disabled by
@@ -169,6 +197,7 @@ export type SetupOptions = {
   admin?: boolean | AdminBootstrapServerOptions
   apps?: AppsOptions
   resources?: RootResources
+  dispatcher?: HttpRemoteDispatcher
   codeTemplatesDiscovery?: boolean | CodeTemplatesDiscoveryOptions
 }
 
