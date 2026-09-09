@@ -502,10 +502,30 @@ export const start: (options?: SetupOptions) => Promise<void> = async (
           // Same helper `ZanixAppDefinition.serve()` (`@zanix/app`'s own dev-loop convenience)
           // calls for itself — never a second, parallel implementation of "per-type
           // `bootstrapServers({application: name})`, skip entirely if `server` is absent".
-          // deno-lint-ignore no-await-in-loop
-          const internalServers = await bootstrapAppServer(name, server, false)
+          try {
+            // deno-lint-ignore no-await-in-loop
+            const internalServers = await bootstrapAppServer(name, server, false)
 
-          allServers.push(...internalServers)
+            allServers.push(...internalServers)
+          } catch (error) {
+            // Isolates ONE named app's own server-bind failure (a real infra error — `AddrInUse`,
+            // etc. — thrown by `bootstrapAppServer`'s own `Deno.serve()` call) from every OTHER app
+            // declared in this same `apps` batch: catching it here, per iteration, is what lets the
+            // loop keep going and give every remaining entry in `zanixApps` its own chance to bind,
+            // regardless of where in the declared order the failing app sits — `activateApps()`
+            // (above) has already registered every app's own routes by this point, independent of
+            // whether its server later binds successfully.
+            //
+            // Logged at ERROR (never `'noSave'`, unlike the "no handlers found" warn below — this
+            // is a genuine bind failure, not merely nothing declared, and belongs in whatever this
+            // process persists its errors to) but deliberately never rethrown: every app that DOES
+            // bind stays up and reachable, regardless of a sibling's own unrelated infra problem.
+            // Matches this function's own "isolate, don't abort the whole boot" posture for the
+            // local/main server's "no handlers found" case right below — extended here to a real
+            // error, not just an empty result, and to each named app individually rather than only
+            // the local server.
+            logger.error(`Zanix App '${name}' failed to start its own server`, error)
+          }
         }
       }
 

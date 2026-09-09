@@ -450,6 +450,88 @@ Deno.test({
 Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
+  // Mirrors a real composition shape: an `apps` map with a frontend-serving app declared before
+  // one or more backend-only apps (e.g. `iam`'s own `spaceApp`/`authApp`/`grantAccessApp`), where
+  // the FIRST app's own server has an unrelated infra problem (a taken port, forced here via
+  // `blocker`) that has nothing to do with the apps declared after it. `blockedApp` is declared
+  // FIRST specifically so the harder ordering is what this proves isolation against — a plain,
+  // unguarded sequential loop would never even reach `healthyApp` below it.
+  name: "start(): one named app's own server-bind failure (a real AddrInUse) is isolated — a " +
+    'sibling app declared AFTER it in the same apps batch still starts and stays reachable, and ' +
+    'start() itself does not reject',
+  fn: async () => {
+    Deno.env.set('MONGO_URI', 'mongodb://localhost')
+    Deno.env.set('REDIS_URI', 'redis://localhost:6379')
+
+    const BLOCKED_PORT = 4610
+    const HEALTHY_PORT = 4611
+    const blocker = Deno.listen({ port: BLOCKED_PORT })
+
+    const blockedApp = defineZanixApp({
+      name: 'zanix-app-bind-blocked',
+      routes: true,
+      setup: (ctx) => {
+        ctx.routes(() => {
+          @Controller('endpoint')
+          class BlockedController extends ZanixController {
+            @Get('ping')
+            public ping() {
+              return 'unreachable'
+            }
+          }
+          void BlockedController
+        })
+      },
+    })
+    const healthyApp = defineZanixApp({
+      name: 'zanix-app-bind-healthy',
+      routes: true,
+      setup: (ctx) => {
+        ctx.routes(() => {
+          @Controller('endpoint')
+          class HealthyController extends ZanixController {
+            @Get('ping')
+            public ping() {
+              return 'zanix-app-bind-healthy'
+            }
+          }
+          void HealthyController
+        })
+      },
+    })
+
+    try {
+      // Must NOT reject — a sibling app's own failure is isolated, not surfaced as a `start()`
+      // rejection (see `start()`'s own doc on the per-app `bootstrapAppServer` loop for why).
+      await Zanix.bootstrap({
+        apps: {
+          'zanix-app-bind-blocked': {
+            definition: blockedApp,
+            server: { rest: { port: BLOCKED_PORT } },
+          },
+          'zanix-app-bind-healthy': {
+            definition: healthyApp,
+            server: { rest: { port: HEALTHY_PORT } },
+          },
+        },
+      })
+      await new Promise((resolve) => setTimeout(resolve, 1000)) // wait for mongo/redis core connect
+
+      const res = await fetch(
+        `http://localhost:${HEALTHY_PORT}/api/zanix-app-bind-healthy/endpoint/ping`,
+      )
+      assertEquals(res.status, 200)
+      assertEquals(await res.text(), 'zanix-app-bind-healthy')
+    } finally {
+      blocker.close()
+      await Zanix.stop()
+    }
+  },
+})
+
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
   name: 'start(): rootDir as an array discovers handlers from every listed directory',
   fn: async () => {
     Deno.env.set('MONGO_URI', 'mongodb://localhost')

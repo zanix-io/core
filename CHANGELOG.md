@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [3.1.2] - 2026-09-08
+
+### Fixed
+
+- **One named `apps` entry's own server-bind failure (e.g. a real `AddrInUse`) no longer aborts
+  `start()` for every other app in the same batch.** `start()`'s own per-app loop (the one that
+  actually calls `bootstrapAppServer` for each `apps` entry declaring a `server`) is sequential and
+  awaits each app one at a time — a failing app earlier in `apps`'s own declared order used to stop
+  the loop from ever reaching a LATER app's own entry, even though `activateApps()` had already
+  registered every app's routes successfully by that point. A real, confirmed case: a `space-server`
+  composing `spaceApp`/`authApp`/`grantAccessApp` as named `apps`, where `spaceApp`'s own SSR server
+  failed to bind — `authApp`/`grantAccessApp` never got their own server started at all, despite
+  having nothing wrong with them. Each app's own `bootstrapAppServer` call is now isolated: a
+  failure is logged at error severity and the loop continues, so every app that CAN bind still does,
+  regardless of an unrelated sibling's own infra problem. `start()` itself no longer rejects for
+  this case.
+
 ## [3.1.1] - 2026-09-03
 
 ### Fixed
