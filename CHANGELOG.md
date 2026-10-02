@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [3.1.3] - 2026-10-01
+
+### Changed
+
+- **`@zanix/asyncmq` range raised to `^0.9.1`** (`@zanix/asyncmq/jobs`, `@zanix/asyncmq/worker` and
+  the lazily imported `@zanix/asyncmq/core`, `ASYNCMQ_CORE_SPECIFIER`). `^0.8.0` excluded every 0.9
+  release, so a project already on `@zanix/asyncmq` 0.9 loaded a second copy of it next to the one
+  this package imported, each with its own module-level state. Both copies declared the worker's
+  `zanix.worker.intensive` queue, and the second declaration failed with a `Conflict` error. The 0.9
+  line adds automatic AMQP reconnection and delivers crons that were lost before the first worker
+  booted.
+
 ## [3.1.2] - 2026-09-08
 
 ### Fixed

@@ -83,7 +83,7 @@ export const NOTIFICATIONS_CORE_SPECIFIER = 'jsr:@zanix/notifications@^1.0.0/cor
 /** `@zanix/asyncmq`'s `./core` subpath — zero-config RabbitMQ connector/worker-provider
  * registration, side-effect only (no export this package reads by name). Same reasoning as
  * `DATAMASTER_CORE_SPECIFIER` above. */
-export const ASYNCMQ_CORE_SPECIFIER = 'jsr:@zanix/asyncmq@^0.8.0/core'
+export const ASYNCMQ_CORE_SPECIFIER = 'jsr:@zanix/asyncmq@^0.9.1/core'
 
 /** `@zanix/admin`'s bare root — `createTemplatesDiscoveryGuard`/`defineLocalAdminApp`/
  * `getLocalAdminSubApps` (used by `start.ts`'s `compose`/`start`, gated behind
