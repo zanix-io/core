@@ -30,8 +30,8 @@
     "jsr:@std/streams@~0.224.5": "0.224.5",
     "jsr:@std/testing@1.0.9": "1.0.9",
     "jsr:@zanix/admin@^2.3.0": "2.3.2",
-    "jsr:@zanix/app@1": "1.0.3",
-    "jsr:@zanix/asyncmq@0.8": "0.8.0",
+    "jsr:@zanix/app@1": "1.0.4",
+    "jsr:@zanix/app@^1.0.4": "1.0.4",
     "jsr:@zanix/asyncmq@~0.9.1": "0.9.1",
     "jsr:@zanix/auth@1": "1.6.0",
     "jsr:@zanix/datamaster@^1.7.0": "1.11.1",
@@ -183,7 +183,7 @@
     "@zanix/admin@2.3.2": {
       "integrity": "dcc7c2d5e2191bfb5df004e319ec577420a4876b49bd2c3021ec1b5aa08c131f",
       "dependencies": [
-        "jsr:@zanix/app",
+        "jsr:@zanix/app@1",
         "jsr:@zanix/auth",
         "jsr:@zanix/datamaster@^1.9.0",
         "jsr:@zanix/notifications",
@@ -191,22 +191,14 @@
         "jsr:@zanix/utils@4"
       ]
     },
-    "@zanix/app@1.0.3": {
-      "integrity": "27963bde86b8759605bf054ddc96770ee7757462bf27337526cfe28756cb07e0",
+    "@zanix/app@1.0.4": {
+      "integrity": "a812e3f434be70968470876383358b871a419a1863634f7a07e1714d15cf844c",
       "dependencies": [
         "jsr:@std/semver",
-        "jsr:@zanix/asyncmq@0.8",
+        "jsr:@zanix/asyncmq",
         "jsr:@zanix/datamaster@^1.7.0",
         "jsr:@zanix/server@^4.3.4",
         "jsr:@zanix/utils@4"
-      ]
-    },
-    "@zanix/asyncmq@0.8.0": {
-      "integrity": "a66f121a851132e99237cf71c2e4b611fb1cdd889f22fe61fc0f97eeb1b0400d",
-      "dependencies": [
-        "jsr:@zanix/server@4",
-        "jsr:@zanix/utils@4",
-        "npm:amqplib"
       ]
     },
     "@zanix/asyncmq@0.9.1": {
@@ -929,7 +921,7 @@
       "jsr:@std/path@0.224",
       "jsr:@std/testing@1.0.9",
       "jsr:@zanix/admin@^2.3.0",
-      "jsr:@zanix/app@1",
+      "jsr:@zanix/app@^1.0.4",
       "jsr:@zanix/asyncmq@~0.9.1",
       "jsr:@zanix/datamaster@^1.9.0",
       "jsr:@zanix/notifications@1",
